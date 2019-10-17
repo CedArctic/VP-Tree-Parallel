@@ -54,8 +54,35 @@ vptree * buildvp(double *X, int n, int d){
     double median = quickselect_median(distancesCopy, n-1);
 
     // Sort points into two new arrays
+    // Calculate array sizes for subtrees. In the event that n-1 is an odd number, the point with median distance goes to the outer subtree
+    int innerLength = (int)floor((n-1) / 2);
+    int outerLength = (int)ceil((n-1) / 2);
+
+    // Pointers to keep track of inner and outer arrays content while sorting points
+    int innerPointer = 0;
+    int outerPointer = 0;
 
     // Create and return node
+    double *inner = calloc(innerLength * d, sizeof(double));
+    double *outer = calloc(outerLength * d, sizeof(double));
+
+    // Sort points
+    for (int i = 0; i < n-1; i++){
+        if(distances[i] < median){
+            memcpy(inner + innerPointer * d, X + i*d, sizeof(double) * d);
+            innerPointer++;
+        }
+        else{
+            memcpy(outer + outerPointer * d, X + i*d, sizeof(double) * d);
+            outerPointer++;
+        }
+    }
+
+    node->inner = buildvp(inner, innerLength, d);
+    node->outer = buildvp(outer, outerLength, d);
+    node->md = median;
+    node->vp = point;
+    return node;
 }
 
 // Return vantage-point subtree with points inside radius
@@ -101,8 +128,7 @@ double * euclidean(double *point, double *points, int n, int d){
 }
 
 // A utility function to swap two elements
-void swap(double *a, double *b)
-{
+void swap(double *a, double *b){
     int t = *a;
     *a = *b;
     *b = t;
@@ -200,13 +226,3 @@ int main()
 
    return 0;
 }
-
-
-/*
-    NOTES:
-
-    Accessing array using address arithmetics:
-    for (i = 0; i <  r; i++)
-      for (j = 0; j < c; j++)
-         printf("%d ", *(arr + i*c + j));
-*/
