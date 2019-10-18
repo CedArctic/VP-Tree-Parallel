@@ -22,6 +22,8 @@ double quickselect(double arr[], int length, int idx);
 // Build the tree
 vptree * buildvp(double *X, int n, int d){
 
+    //TODO: free up memory
+
     // Create node to be returned
     vptree *node = malloc(sizeof(vptree));
 
@@ -42,13 +44,14 @@ vptree * buildvp(double *X, int n, int d){
 
     // Copy all other points to a new vector (i.e all of X from rows 1 to n-1)
     double *points = calloc((n-1) * d, sizeof(double));
-    memcpy(point, X, sizeof(double) * d * (n-1));
+    memcpy(points, X, sizeof(double) * d * (n-1));
 
     // Create array that holds euclidean distance of point from all other points
     double *distances = euclidean(point, points, n-1, d);
 
+
     // At this point distances[i] indicates the distance of point i in points from the vantage point
-    // Find median by creating a copy of distances and sorting it
+    // Find median by creating a copy of distances and passing it to QuickSelect
     double *distancesCopy = calloc(n-1, sizeof(double));
     memcpy(distancesCopy, distances, sizeof(double) * (n-1));
     double median = quickselect_median(distancesCopy, n-1);
@@ -56,7 +59,9 @@ vptree * buildvp(double *X, int n, int d){
     // Sort points into two new arrays
     // Calculate array sizes for subtrees. In the event that n-1 is an odd number, the point with median distance goes to the outer subtree
     int innerLength = (int)floor((n-1) / 2);
-    int outerLength = (int)ceil((n-1) / 2);
+    int outerLength = n - 1 - innerLength;
+    // ERROR: Outer length calculation seems to be off when using ceil(). That's why above workaround is used
+    //int outerLength = (int)ceil((n-1) / 2);
 
     // Pointers to keep track of inner and outer arrays content while sorting points
     int innerPointer = 0;
@@ -78,8 +83,21 @@ vptree * buildvp(double *X, int n, int d){
         }
     }
 
-    node->inner = buildvp(inner, innerLength, d);
-    node->outer = buildvp(outer, outerLength, d);
+    //TODO: Maybe assert that innerPointer == innerLength - 1 at this point
+
+    if(innerLength > 0){
+       node->inner = buildvp(inner, innerLength, d);
+    }
+    else{
+        node->inner = NULL;
+    }
+
+    if(outerLength > 0){
+       node->outer = buildvp(outer, outerLength, d);
+    }
+    else{
+        node->outer = NULL;
+    }
     node->md = median;
     node->vp = point;
     return node;
@@ -167,7 +185,8 @@ double quickselect_median(double arr[], int length){
     }
 }
 
-// idx is the index of the point we want to find when the array is sorted. For the median idx should be the middle one (i.e (length+1)/2 for odd lengths etc)
+// Returns the idx-th element of arr when arr is sorted
+// idx is the index (starting from 1) of the point we want to find when the array is sorted. For the median idx should be the middle one (i.e (length+1)/2 for odd lengths etc)
 double quickselect(double arr[], int length, int idx){
 
     if (length == 1){
@@ -179,7 +198,7 @@ double quickselect(double arr[], int length, int idx){
     // Get index of pivot after we partition the array
     int pivotIndex = partition(arr, 0, length - 1);
 
-    // Create the upper and lower arrays that occur after partitioning in QuickSort fashion
+    // Create the higher and lower arrays that occur after partitioning in QuickSort fashion
     int lowerLength = pivotIndex;
     int higherLength = (length - (pivotIndex + 1));
     double *lower = calloc(lowerLength, sizeof(double));
@@ -187,29 +206,44 @@ double quickselect(double arr[], int length, int idx){
     memcpy(lower, arr, sizeof(double) * lowerLength);
     memcpy(higher, arr + pivotIndex + 1, sizeof(double) * higherLength);
 
+    // Variable to store result of following recursive calls
+    int result = 0;
+
     // This means that the point we're looking (median in our case) is in the lower partition
     if (idx <= lowerLength){
-        return quickselect(lower, lowerLength, idx);
+        result = quickselect(lower, lowerLength, idx);
     }
     // This means that the median is our pivot point
     else if(idx <= lowerLength + 1){
-        return pivot;
+        result = pivot;
     }
-    // This means that the median is in the upper partition
+    // This means that the median is in the higher partition
     else{
-        return quickselect(higher, higherLength, idx - lowerLength - 1);
+        result =  quickselect(higher, higherLength, idx - lowerLength - 1);
     }
 
+    // Free memory allocated to lower and higher
+    free(lower);
+    free(higher);
+
+    // Return result
+    return result;
 }
 
 int main()
 {
-
+    double arr[8] = {12,6,3,3,5,19,7,8};
+    vptree *tree = buildvp(arr, 4, 2);
+    printf("Root median: %f", tree->md);
+    /* QuickSelect Test
     double arr[8] = {1,2,3,3,5,6,7,8};
 
     double median = quickselect_median(arr, 8);
 
     printf("Median: %f", median);
+
+    */
+
 
     /*
     int r = 3, c = 4;
