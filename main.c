@@ -135,9 +135,10 @@ void swap(double *a, double *b){
 }
 
 // QuickSort Partition function
+// low and high are the range of indexes in arr where partition should work
 int partition (double arr[], int low, int high){
     // Select a pivot and initialize flag to position of smallest element before pivot
-    int pivot = arr[high];
+    double pivot = arr[high];
     int i = (low - 1);
 
     // Go through the array examining each element
@@ -162,7 +163,7 @@ double quickselect_median(double arr[], int length){
         return quickselect(arr, length, (length+1)/2);
     }
     else{
-        return 0.5 * (quickselect(arr, length, length/2 - 1) + quickselect(arr, length, length/2));
+        return 0.5 * (quickselect(arr, length, length/2) + quickselect(arr, length, length/2 + 1));
     }
 }
 
@@ -179,18 +180,19 @@ double quickselect(double arr[], int length, int idx){
     int pivotIndex = partition(arr, 0, length - 1);
 
     // Create the upper and lower arrays that occur after partitioning in QuickSort fashion
-    double *lower, *higher;
     int lowerLength = pivotIndex;
     int higherLength = (length - (pivotIndex + 1));
+    double *lower = calloc(lowerLength, sizeof(double));
+    double *higher = calloc(higherLength, sizeof(double));
     memcpy(lower, arr, sizeof(double) * lowerLength);
     memcpy(higher, arr + pivotIndex + 1, sizeof(double) * higherLength);
 
     // This means that the point we're looking (median in our case) is in the lower partition
-    if (idx < lowerLength){
+    if (idx <= lowerLength){
         return quickselect(lower, lowerLength, idx);
     }
     // This means that the median is our pivot point
-    else if(idx < lowerLength + 1){
+    else if(idx <= lowerLength + 1){
         return pivot;
     }
     // This means that the median is in the upper partition
@@ -202,6 +204,14 @@ double quickselect(double arr[], int length, int idx){
 
 int main()
 {
+
+    double arr[8] = {1,2,3,3,5,6,7,8};
+
+    double median = quickselect_median(arr, 8);
+
+    printf("Median: %f", median);
+
+    /*
     int r = 3, c = 4;
     int *arr = malloc(r * c * sizeof(int));
     int *point = calloc(4, sizeof(double));
@@ -219,7 +229,7 @@ int main()
          printf("%d ", *(arr + i*c + j));
 
     for (i=0; i<4; i++)
-        printf("%d ", point[i]);
+        printf("%d ", point[i]); */
 
    /* Code for further processing and free the
       dynamically allocated memory */
