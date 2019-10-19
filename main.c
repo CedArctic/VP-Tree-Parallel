@@ -147,7 +147,7 @@ double * euclidean(double *point, double *points, int n, int d){
 
 // A utility function to swap two elements
 void swap(double *a, double *b){
-    int t = *a;
+    double t = *a;
     *a = *b;
     *b = t;
 }
@@ -207,7 +207,7 @@ double quickselect(double arr[], int length, int idx){
     memcpy(higher, arr + pivotIndex + 1, sizeof(double) * higherLength);
 
     // Variable to store result of following recursive calls
-    int result = 0;
+    double result = 0;
 
     // This means that the point we're looking (median in our case) is in the lower partition
     if (idx <= lowerLength){
@@ -232,7 +232,7 @@ double quickselect(double arr[], int length, int idx){
 
 int main()
 {
-    double arr[8] = {12,6,3,3,5,19,7,8};
+    double arr[8] = {12,2,3,3,5,19,7,8};
     vptree *tree = buildvp(arr, 4, 2);
     printf("Root median: %f", tree->md);
     /* QuickSelect Test
