@@ -22,8 +22,6 @@ double quickselect(double arr[], int length, int idx);
 // Build the tree
 vptree * buildvp(double *X, int n, int d){
 
-    //TODO: free up memory
-
     // Create node to be returned
     vptree *node = malloc(sizeof(vptree));
 
@@ -68,17 +66,17 @@ vptree * buildvp(double *X, int n, int d){
     int outerPointer = 0;
 
     // Create and return node
-    double *inner = calloc(innerLength * d, sizeof(double));
-    double *outer = calloc(outerLength * d, sizeof(double));
+    double *innerPoints = calloc(innerLength * d, sizeof(double));
+    double *outerPoints = calloc(outerLength * d, sizeof(double));
 
     // Sort points
     for (int i = 0; i < n-1; i++){
         if(distances[i] < median){
-            memcpy(inner + innerPointer * d, X + i*d, sizeof(double) * d);
+            memcpy(innerPoints + innerPointer * d, X + i*d, sizeof(double) * d);
             innerPointer++;
         }
         else{
-            memcpy(outer + outerPointer * d, X + i*d, sizeof(double) * d);
+            memcpy(outerPoints + outerPointer * d, X + i*d, sizeof(double) * d);
             outerPointer++;
         }
     }
@@ -86,20 +84,28 @@ vptree * buildvp(double *X, int n, int d){
     //TODO: Maybe assert that innerPointer == innerLength - 1 at this point
 
     if(innerLength > 0){
-       node->inner = buildvp(inner, innerLength, d);
+       node->inner = buildvp(innerPoints, innerLength, d);
     }
     else{
         node->inner = NULL;
     }
 
     if(outerLength > 0){
-       node->outer = buildvp(outer, outerLength, d);
+       node->outer = buildvp(outerPoints, outerLength, d);
     }
     else{
         node->outer = NULL;
     }
     node->md = median;
     node->vp = point;
+
+    // De-allocate unused memory
+    free(points);
+    free(distances);
+    free(distancesCopy);
+    free(innerPoints);
+    free(outerPoints);
+
     return node;
 }
 
@@ -155,6 +161,7 @@ void swap(double *a, double *b){
 // QuickSort Partition function
 // low and high are the range of indexes in arr where partition should work
 int partition (double arr[], int low, int high){
+
     // Select a pivot and initialize flag to position of smallest element before pivot
     double pivot = arr[high];
     int i = (low - 1);
@@ -177,6 +184,7 @@ int partition (double arr[], int low, int high){
 
 // Returns the median using the QuickSelect algorithm
 double quickselect_median(double arr[], int length){
+
     if (length % 2 == 1){
         return quickselect(arr, length, (length+1)/2);
     }
@@ -189,6 +197,7 @@ double quickselect_median(double arr[], int length){
 // idx is the index (starting from 1) of the point we want to find when the array is sorted. For the median idx should be the middle one (i.e (length+1)/2 for odd lengths etc)
 double quickselect(double arr[], int length, int idx){
 
+    // Check to end recursion
     if (length == 1){
         return arr[0];
     }
@@ -232,41 +241,10 @@ double quickselect(double arr[], int length, int idx){
 
 int main()
 {
-    double arr[8] = {12,2,3,3,5,19,7,8};
-    vptree *tree = buildvp(arr, 4, 2);
+    double arr[10] = {12,2,3,3,5,19,7,8,9,10};
+    vptree *tree = buildvp(arr, 5, 2);
     printf("Root median: %f", tree->md);
-    /* QuickSelect Test
-    double arr[8] = {1,2,3,3,5,6,7,8};
 
-    double median = quickselect_median(arr, 8);
-
-    printf("Median: %f", median);
-
-    */
-
-
-    /*
-    int r = 3, c = 4;
-    int *arr = malloc(r * c * sizeof(int));
-    int *point = calloc(4, sizeof(double));
-
-
-    int i, j, count = 0;
-    for (i = 0; i <  r; i++)
-      for (j = 0; j < c; j++)
-         *(arr + i*c + j) = ++count;
-
-    memcpy(point, (arr + (1)*4), sizeof(int) * 4);
-
-    for (i = 0; i <  r; i++)
-      for (j = 0; j < c; j++)
-         printf("%d ", *(arr + i*c + j));
-
-    for (i=0; i<4; i++)
-        printf("%d ", point[i]); */
-
-   /* Code for further processing and free the
-      dynamically allocated memory */
-
+    //TODO: Add a function to visualize tree
    return 0;
 }
