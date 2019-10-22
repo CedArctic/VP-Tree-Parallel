@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "../inc/vptree.h"
 
-#include "inc/vptree.h"
+#define POINTS 10000
+#define DIMENSIONS 700
 
 // Function Prototypes
 vptree * buildvp(double *X, int n, int d);
@@ -144,7 +146,8 @@ double * euclidean(double *point, double *points, int n, int d){
     for (int i = 0; i < n; i++){
         accumulator = 0;
         for (int j = 0; j < d; j++){
-            accumulator += pow((point[j] - *(points + i * n + j)), 2);
+            //printf("Current (%d) points element: %.2f\n", i*d+j, *(points + i * d + j));
+            accumulator += pow((point[j] - *(points + i * d + j)), 2);
         }
         distances[i] = sqrt(accumulator);
     }
@@ -241,10 +244,26 @@ double quickselect(double arr[], int length, int idx){
 
 int main()
 {
+
+    // Intialize random number generator
+    time_t t;
+    srand((unsigned) time(&t));
+
+    // Create a random X array
+    double *X = calloc(POINTS * DIMENSIONS, sizeof(double));
+    for(int i = 0; i < POINTS * DIMENSIONS; i++)
+        X[i] = rand() % 50;
+    vptree *tree = buildvp(X, POINTS, DIMENSIONS);
+    printf("Root median: %f", tree->md);
+    
+
+
+    /*
     double arr[10] = {12,2,3,3,5,19,7,8,9,10};
     vptree *tree = buildvp(arr, 5, 2);
     printf("Root median: %f", tree->md);
+    */
 
     //TODO: Add a function to visualize tree
-   return 0;
+    return 0;
 }
