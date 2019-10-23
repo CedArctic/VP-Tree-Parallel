@@ -57,24 +57,15 @@ vptree * buildvp(double *X, int n, int d){
     double median = quickselect_median(distancesCopy, n-1);
 
     // Sort points into two new arrays
-    // Calculate array sizes for subtrees. In the event that n-1 is an odd number, the point with median distance goes to the outer subtree
-    int innerLength = (int)floor((n-1) / 2);
-    // In the event where we have multiple values equal to the median the tree becomes unbalanced so we need to calculate this
-    // innerLength + 1 gives us the base(0) index of the median in the array
-    int extension = 1;
-    for(int i = innerLength + 2; i++; i < n-1){
-        if(distances[i] == distances[innerLength + 1]){
-            extension++;
-        }
-        else{
-            break;
+    // Calculate array sizes for subtrees. Values up to and equal to the median go on the inner tree
+    int innerLength = 0;
+    for (int i = 0; i < n-1; i++){
+        if(distances[i] <= median){
+            innerLength++;
         }
     }
-    // The length of the inner points array is extended to include the median and all equals to it from the middle and upwards
-    innerLength += extension;
     int outerLength = n - 1 - innerLength;
-    // ERROR: Outer length calculation seems to be off when using ceil(). That's why above workaround is used
-    //int outerLength = (int)ceil((n-1) / 2);
+    //TODO: Perhaps use distancesCopy to reduce the above linear scan to half
 
     // Pointers to keep track of inner and outer arrays content while sorting points
     int innerPointer = 0;
