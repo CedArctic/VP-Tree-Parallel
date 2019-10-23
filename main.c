@@ -59,6 +59,19 @@ vptree * buildvp(double *X, int n, int d){
     // Sort points into two new arrays
     // Calculate array sizes for subtrees. In the event that n-1 is an odd number, the point with median distance goes to the outer subtree
     int innerLength = (int)floor((n-1) / 2);
+    // In the event where we have multiple values equal to the median the tree becomes unbalanced so we need to calculate this
+    // innerLength + 1 gives us the base(0) index of the median in the array
+    int extension = 1;
+    for(int i = innerLength + 2; i++; i < n-1){
+        if(distances[i] == distances[innerLength + 1]){
+            extension++;
+        }
+        else{
+            break;
+        }
+    }
+    // The length of the inner points array is extended to include the median and all equals to it from the middle and upwards
+    innerLength += extension;
     int outerLength = n - 1 - innerLength;
     // ERROR: Outer length calculation seems to be off when using ceil(). That's why above workaround is used
     //int outerLength = (int)ceil((n-1) / 2);
@@ -73,7 +86,7 @@ vptree * buildvp(double *X, int n, int d){
 
     // Sort points
     for (int i = 0; i < n-1; i++){
-        if(distances[i] < median){
+        if(distances[i] <= median){
             memcpy(innerPoints + innerPointer * d, X + i*d, sizeof(double) * d);
             innerPointer++;
         }
@@ -212,11 +225,13 @@ double quickselect(double arr[], int length, int idx){
 
     // Create the higher and lower arrays that occur after partitioning in QuickSort fashion
     int lowerLength = pivotIndex;
-    int higherLength = (length - (pivotIndex + 1));
+    pivotIndex++;
+    int higherLength = (length - (lowerLength + 1));
+    // At this point pivotIndex, lowerLength and higherLength all start from 1 not 0
     double *lower = calloc(lowerLength, sizeof(double));
     double *higher = calloc(higherLength, sizeof(double));
     memcpy(lower, arr, sizeof(double) * lowerLength);
-    memcpy(higher, arr + pivotIndex + 1, sizeof(double) * higherLength);
+    memcpy(higher, arr + pivotIndex, sizeof(double) * higherLength);
 
     // Variable to store result of following recursive calls
     double result = 0;
@@ -226,12 +241,12 @@ double quickselect(double arr[], int length, int idx){
         result = quickselect(lower, lowerLength, idx);
     }
     // This means that the median is our pivot point
-    else if(idx <= lowerLength + 1){
+    else if(idx == pivotIndex){
         result = pivot;
     }
     // This means that the median is in the higher partition
     else{
-        result =  quickselect(higher, higherLength, idx - lowerLength - 1);
+        result = quickselect(higher, higherLength, idx - pivotIndex);
     }
 
     // Free memory allocated to lower and higher
@@ -245,6 +260,7 @@ double quickselect(double arr[], int length, int idx){
 int main()
 {
 
+
     // Intialize random number generator
     time_t t;
     srand((unsigned) time(&t));
@@ -255,7 +271,7 @@ int main()
         X[i] = rand() % 50;
     vptree *tree = buildvp(X, POINTS, DIMENSIONS);
     printf("Root median: %f", tree->md);
-    
+
 
 
     /*
