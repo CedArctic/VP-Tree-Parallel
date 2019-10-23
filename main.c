@@ -4,8 +4,8 @@
 #include <math.h>
 #include "../inc/vptree.h"
 
-#define POINTS 10000
-#define DIMENSIONS 700
+#define POINTS 5642
+#define DIMENSIONS 90
 
 // Function Prototypes
 vptree * buildvp(double *X, int n, int d);
@@ -25,7 +25,7 @@ double quickselect(double arr[], int length, int idx);
 vptree * buildvp(double *X, int n, int d){
 
     // Create node to be returned
-    vptree *node = malloc(sizeof(vptree));
+    vptree *node = calloc(1, sizeof(vptree));
 
     // Check to end recursion: if points array is of size 0 - we are returning a leaf
     if (n == 1){
@@ -259,17 +259,9 @@ int main()
     // Create a random X array
     double *X = calloc(POINTS * DIMENSIONS, sizeof(double));
     for(int i = 0; i < POINTS * DIMENSIONS; i++)
-        X[i] = rand() % 50;
+        X[i] = rand();
     vptree *tree = buildvp(X, POINTS, DIMENSIONS);
     printf("Root median: %f", tree->md);
-
-
-
-    /*
-    double arr[10] = {12,2,3,3,5,19,7,8,9,10};
-    vptree *tree = buildvp(arr, 5, 2);
-    printf("Root median: %f", tree->md);
-    */
 
     //TODO: Add a function to visualize tree
     return 0;
