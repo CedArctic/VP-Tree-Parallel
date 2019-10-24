@@ -21,18 +21,31 @@ void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
 double quickselect_median(double arr[], int length);
 double quickselect(double arr[], int length, int idx);
+void *buildvp_wrapper(void *arg);
 
 // Flag used to detect if build_vp has already been called. If it has not, X is the original input array.
 // If it has it means that X is the points vector with an idx vector extended to id at the end
 bool runFlag = false;
-// Development flag to switch execution mode from serial to parallel
-bool parallelEx = false;
+// Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
+bool parallelDis = false;
+bool parallelSub = true;
 
 // Struct used to pass arguments to threads for distance calculation
 typedef struct{
     int tid, n, d;
     double *point, *points, *distances;
 }dtargs;
+
+// Struct used to pass arguments to threads for subtree creation
+typedef struct{
+    int tid, n, d;
+    double *X, *subtree;
+}stargs;
+
+void *buildvp_wrapper(void *arg){
+    ((stargs *)arg)->subtree = buildvp(((stargs *)arg)->X, ((stargs *)arg)->n, ((stargs *)arg)->d);
+    return;
+}
 
 // Build the tree
 vptree * buildvp(double *X, int n, int d){
@@ -82,46 +95,47 @@ vptree * buildvp(double *X, int n, int d){
     double *distances = calloc(n-1, sizeof(double));
 
     // Block size * threads = points number (n-1)
-    pthread_t thread[THREADS];
-    dtargs arg[THREADS];
+    pthread_t disThread[THREADS];
+    dtargs disArg[THREADS];
     // blockSize = Points per thread
     int blockSize = floor((float)(n-1) / THREADS);
 
+    //TODO: Point number assignment per thread bellow can probably be done in a better way
     // Calculate distances in parallel if true, else do it sequentially
-    if(parallelEx == true){
+    if(parallelDis == true){
         //printf("Points: %d\n", n-1);
         // Create threads
         for (int i = 0; i < THREADS; i++){
-            arg[i].d = d;
-            arg[i].point = point;
-            arg[i].tid = i;
-            arg[i].points = points + i * blockSize * d;
-            arg[i].distances = distances + i * blockSize;
+            disArg[i].d = d;
+            disArg[i].point = point;
+            disArg[i].tid = i;
+            disArg[i].points = points + i * blockSize * d;
+            disArg[i].distances = distances + i * blockSize;
             // Check how many points to assign to each block. The last block gets the remaining points
             if( i < THREADS - 1){
-                arg[i].n = blockSize;
+                disArg[i].n = blockSize;
                 //printf("Thread %d got %d points\n", i, blockSize);
             }
             else{
-                arg[i].n = (n-1) - blockSize * i;
+                disArg[i].n = (n-1) - blockSize * i;
                 //printf("Thread %d got %d points\n\n", i, arg[i].n);
             }
-            pthread_create(&thread[i], NULL, euclidean, (void *)&arg[i]);
+            pthread_create(&disThread[i], NULL, euclidean, (void *)&disArg[i]);
         }
 
         // Join threads
         for (int i = 0; i < THREADS; i++){
-            pthread_join(thread[i], NULL);
+            pthread_join(disThread[i], NULL);
         }
     }
     else{
-        arg[0].d = d;
-        arg[0].point = point;
-        arg[0].tid = 0;
-        arg[0].points = points;
-        arg[0].n = n-1;
-        arg[0].distances = distances;
-        euclidean((void *)&arg[0]);
+        disArg[0].d = d;
+        disArg[0].point = point;
+        disArg[0].tid = 0;
+        disArg[0].points = points;
+        disArg[0].n = n-1;
+        disArg[0].distances = distances;
+        euclidean((void *)&disArg[0]);
     }
 
 
@@ -164,29 +178,69 @@ vptree * buildvp(double *X, int n, int d){
         }
     }
 
-    //TODO: Maybe assert that innerPointer == innerLength - 1 at this point
+    // Booleans to keep track whether a thread has been created to work on a subtree
+    bool threadActive[2];
 
-    // Assign node fields
-    if(innerLength > 0){
-       node->inner = buildvp(innerPoints, innerLength, d);
+    // Thread and stargs arrays for parallel subtree threads
+    pthread_t subThread[2];
+    stargs subArg[2];
+
+    // Build subtrees in parallel or sequentially
+    if(parallelSub == true){
+
+        // Create threads
+        if(innerLength > 0){
+            threadActive[0] = true;
+            subArg[0].d = d;
+            subArg[0].n = innerLength;
+            subArg[0].subtree = node->inner;
+            subArg[0].tid = 0;
+            subArg[0].X = innerPoints;
+            pthread_create(&subThread[0], NULL, buildvp_wrapper, (void *)&subArg[0]);
+        }
+
+        if(outerLength > 0){
+            threadActive[1] = true;
+            subArg[1].d = d;
+            subArg[1].n = outerLength;
+            subArg[1].subtree = node->outer;
+            subArg[1].tid = 1;
+            subArg[1].X = outerPoints;
+            pthread_create(&subThread[1], NULL, buildvp_wrapper, (void *)&subArg[1]);
+        }
+
+        // Join threads
+        for(int i=0; i<2; i++){
+            if(threadActive[i] == true){
+                pthread_join(subThread[i], NULL);
+            }
+        }
+
+    }else{
+        if(innerLength > 0){
+            node->inner = buildvp(innerPoints, innerLength, d);
+        }
+        if(outerLength > 0){
+            node->outer = buildvp(outerPoints, outerLength, d);
+        }
     }
-    else{
+
+
+    if(innerLength < 1){
         node->inner = NULL;
     }
+    if(outerLength < 1){
+        node->outer= NULL;
+    }
 
-    if(outerLength > 0){
-       node->outer = buildvp(outerPoints, outerLength, d);
-    }
-    else{
-        node->outer = NULL;
-    }
+
     node->md = median;
     node->vp = point;
     node->idx = id;
 
     // De-allocate unused memory
     free(points);
-    //free(distances);
+    free(distances);
     free(distancesCopy);
     free(innerPoints);
     free(outerPoints);
@@ -220,7 +274,7 @@ int getIDX(vptree * T){
     return T->idx;
 }
 
-// Returns pointer to an array that contains the distances of all points from point
+// Calculates the distances of all points from point and writes them to an array
 void *euclidean(void *arg){
 
     // Retrieve variables by casting the argument to a dtarg struct pointer
