@@ -5,9 +5,6 @@
 #include <math.h>
 #include "../inc/vptree.h"
 
-#define POINTS 100000
-#define DIMENSIONS 100
-
 // Function Prototypes
 vptree * buildvp(double *X, int n, int d);
 vptree * getInner(vptree * T);
@@ -271,23 +268,4 @@ double quickselect(double arr[], int length, int idx){
 
     // Return result
     return result;
-}
-
-int main()
-{
-
-
-    // Intialize random number generator
-    time_t t;
-    srand((unsigned) time(&t));
-
-    // Create a random X array
-    double *X = calloc(POINTS * DIMENSIONS, sizeof(double));
-    for(int i = 0; i < POINTS * DIMENSIONS; i++)
-        X[i] = rand();
-    vptree *tree = buildvp(X, POINTS, DIMENSIONS);
-    printf("Root median: %f", tree->md);
-
-    //TODO: Add a function to visualize tree
-    return 0;
 }
