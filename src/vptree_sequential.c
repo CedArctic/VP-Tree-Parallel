@@ -4,8 +4,8 @@
 #include <math.h>
 #include "../inc/vptree.h"
 
-#define POINTS 5642
-#define DIMENSIONS 90
+#define POINTS 100000
+#define DIMENSIONS 1000
 
 // Function Prototypes
 vptree * buildvp(double *X, int n, int d);
