@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <math.h>
 #include "../inc/vptree.h"
 
 #define POINTS 100000
-#define DIMENSIONS 1000
+#define DIMENSIONS 100
 
 // Function Prototypes
 vptree * buildvp(double *X, int n, int d);
@@ -20,9 +21,27 @@ int partition (double arr[], int low, int high);
 double quickselect_median(double arr[], int length);
 double quickselect(double arr[], int length, int idx);
 
+// Used to detect if build_vp has already been called. If it has not, X is the original input array.
+// If it has it means that X is the points vector with an idx vector extended to id at the end
+bool runFlag = false;
 
 // Build the tree
 vptree * buildvp(double *X, int n, int d){
+
+    // Allocate space for the index array
+    double *ids = calloc(n, sizeof(double));
+
+    // If runFlag is 1 it means that we're not on the first execution and that X has an ids array at its end
+    // Else if we're on the first run we're going to generate the ids array
+    if (runFlag == true){
+        memcpy(ids, X + n * d, sizeof(double) * n);
+    }
+    else{
+        for (int i = 0; i < n; i++)
+            ids[i] = i;
+    }
+    // Set flag
+    runFlag = true;
 
     // Create node to be returned
     vptree *node = calloc(1, sizeof(vptree));
@@ -31,14 +50,16 @@ vptree * buildvp(double *X, int n, int d){
     if (n == 1){
         node->inner = NULL;
         node->outer = NULL;
+        node->idx = ids[0];
         node->md = 0;
         node->vp = calloc(d, sizeof(double));
         memcpy(node->vp, X, sizeof(double) * d);
         return node;
     }
 
-    // Choose a random point as the vantage point: in this case we take the last one in X
+    // Choose the last point in X as the vantage point
     double *point = calloc(d, sizeof(double));
+    double id = ids[n-1];
     // Copy the point from the original matrix to a new vector
     memcpy(point, (X + (n-1)*d), sizeof(double) * d);
 
@@ -48,7 +69,6 @@ vptree * buildvp(double *X, int n, int d){
 
     // Create array that holds euclidean distance of point from all other points
     double *distances = euclidean(point, points, n-1, d);
-
 
     // At this point distances[i] indicates the distance of point i in points from the vantage point
     // Find median by creating a copy of distances and passing it to QuickSelect
@@ -71,24 +91,27 @@ vptree * buildvp(double *X, int n, int d){
     int innerPointer = 0;
     int outerPointer = 0;
 
-    // Create and return node
-    double *innerPoints = calloc(innerLength * d, sizeof(double));
-    double *outerPoints = calloc(outerLength * d, sizeof(double));
+    // Create arrays for inner and outer points. Arrays contain the points and a list of ids (one for each point)
+    double *innerPoints = calloc(innerLength * d + innerLength, sizeof(double));
+    double *outerPoints = calloc(outerLength * d + outerLength, sizeof(double));
 
     // Sort points
     for (int i = 0; i < n-1; i++){
         if(distances[i] <= median){
             memcpy(innerPoints + innerPointer * d, X + i*d, sizeof(double) * d);
+            innerPoints[innerLength * d + innerPointer] = ids[i];
             innerPointer++;
         }
         else{
             memcpy(outerPoints + outerPointer * d, X + i*d, sizeof(double) * d);
+            outerPoints[outerLength * d + outerPointer] = ids[i];
             outerPointer++;
         }
     }
 
     //TODO: Maybe assert that innerPointer == innerLength - 1 at this point
 
+    // Assign node fields
     if(innerLength > 0){
        node->inner = buildvp(innerPoints, innerLength, d);
     }
@@ -104,6 +127,7 @@ vptree * buildvp(double *X, int n, int d){
     }
     node->md = median;
     node->vp = point;
+    node->idx = id;
 
     // De-allocate unused memory
     free(points);
@@ -111,6 +135,7 @@ vptree * buildvp(double *X, int n, int d){
     free(distancesCopy);
     free(innerPoints);
     free(outerPoints);
+    free(ids);
 
     return node;
 }
