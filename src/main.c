@@ -4,7 +4,6 @@
 
 #define POINTS 100000
 #define DIMENSIONS 1000
-#define THREADS 4
 
 int main()
 {

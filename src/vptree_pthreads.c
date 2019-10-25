@@ -6,8 +6,7 @@
 #include <pthread.h>
 #include "../inc/vptree.h"
 
-//TODO: Remove this and leave it in main after writing is complete
-#define THREADS 4
+#define THREADS 2
 
 // Function Prototypes
 vptree * buildvp(double *X, int n, int d);
@@ -24,52 +23,62 @@ double quickselect(double arr[], int length, int idx);
 void *buildvp_wrapper(void *arg);
 
 // Flag used to detect if build_vp has already been called. If it has not, X is the original input array.
-// If it has it means that X is the points vector with an idx vector extended to id at the end
+// If it has it means that X is the points vector with an idx vector extended to it at the end
 bool runFlag = false;
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
-bool parallelDis = false;
+bool parallelDis = true;
 bool parallelSub = true;
 
 // Struct used to pass arguments to threads for distance calculation
-typedef struct{
+typedef struct
+{
     int tid, n, d;
     double *point, *points, *distances;
-}dtargs;
+} dtargs;
 
 // Struct used to pass arguments to threads for subtree creation
-typedef struct{
+typedef struct
+{
     int tid, n, d;
-    double *X, *subtree;
-}stargs;
+    double *X;
+    vptree *subtree;
+} stargs;
 
-void *buildvp_wrapper(void *arg){
+// Wrapper function to use buildvp() with pthreads
+void *buildvp_wrapper(void *arg)
+{
     ((stargs *)arg)->subtree = buildvp(((stargs *)arg)->X, ((stargs *)arg)->n, ((stargs *)arg)->d);
     return;
 }
 
-// Build the tree
-vptree * buildvp(double *X, int n, int d){
+// Function that recursively builds the binary tree
+vptree * buildvp(double *X, int n, int d)
+{
 
     // Allocate space for the index array
     double *ids = calloc(n, sizeof(double));
 
-    // If runFlag is 1 it means that we're not on the first execution and that X has an ids array at its end
-    // Else if we're on the first run we're going to generate the ids array
-    if (runFlag == true){
+    // If runFlag is true -> not first execution -> X has an ids array at its end
+    // Else if we're on the first run, we're going to generate the ids array
+    if (runFlag == true)
+    {
         memcpy(ids, X + n * d, sizeof(double) * n);
     }
-    else{
+    else
+    {
         for (int i = 0; i < n; i++)
             ids[i] = i;
     }
-    // Set flag
+
+    // Set run flag to true
     runFlag = true;
 
     // Create node to be returned
     vptree *node = calloc(1, sizeof(vptree));
 
     // Check to end recursion: if points array is of size 0 - we are returning a leaf
-    if (n == 1){
+    if (n == 1)
+    {
         node->inner = NULL;
         node->outer = NULL;
         node->idx = ids[0];
@@ -82,14 +91,13 @@ vptree * buildvp(double *X, int n, int d){
     // Choose the last point in X as the vantage point
     double *point = calloc(d, sizeof(double));
     double id = ids[n-1];
+
     // Copy the point from the original matrix to a new vector
     memcpy(point, (X + (n-1)*d), sizeof(double) * d);
 
     // Copy all other points to a new vector (i.e all of X from rows 1 to n-1)
     double *points = calloc((n-1) * d, sizeof(double));
     memcpy(points, X, sizeof(double) * d * (n-1));
-
-
 
     // Create array that holds euclidean distance of point from all other points
     double *distances = calloc(n-1, sizeof(double));
@@ -102,33 +110,37 @@ vptree * buildvp(double *X, int n, int d){
 
     //TODO: Point number assignment per thread bellow can probably be done in a better way
     // Calculate distances in parallel if true, else do it sequentially
-    if(parallelDis == true){
-        //printf("Points: %d\n", n-1);
+    if(parallelDis == true)
+    {
         // Create threads
-        for (int i = 0; i < THREADS; i++){
+        for (int i = 0; i < THREADS; i++)
+        {
             disArg[i].d = d;
             disArg[i].point = point;
             disArg[i].tid = i;
             disArg[i].points = points + i * blockSize * d;
             disArg[i].distances = distances + i * blockSize;
+
             // Check how many points to assign to each block. The last block gets the remaining points
-            if( i < THREADS - 1){
+            if( i < THREADS - 1)
+            {
                 disArg[i].n = blockSize;
-                //printf("Thread %d got %d points\n", i, blockSize);
             }
-            else{
+            else
+            {
                 disArg[i].n = (n-1) - blockSize * i;
-                //printf("Thread %d got %d points\n\n", i, arg[i].n);
             }
             pthread_create(&disThread[i], NULL, euclidean, (void *)&disArg[i]);
         }
 
         // Join threads
-        for (int i = 0; i < THREADS; i++){
+        for (int i = 0; i < THREADS; i++)
+        {
             pthread_join(disThread[i], NULL);
         }
     }
-    else{
+    else
+    {
         disArg[0].d = d;
         disArg[0].point = point;
         disArg[0].tid = 0;
@@ -148,8 +160,10 @@ vptree * buildvp(double *X, int n, int d){
     // Sort points into two new arrays
     // Calculate array sizes for subtrees. Values up to and equal to the median go on the inner tree
     int innerLength = 0;
-    for (int i = 0; i < n-1; i++){
-        if(distances[i] <= median){
+    for (int i = 0; i < n-1; i++)
+    {
+        if(distances[i] <= median)
+        {
             innerLength++;
         }
     }
@@ -165,13 +179,16 @@ vptree * buildvp(double *X, int n, int d){
     double *outerPoints = calloc(outerLength * d + outerLength, sizeof(double));
 
     // Sort points
-    for (int i = 0; i < n-1; i++){
-        if(distances[i] <= median){
+    for (int i = 0; i < n-1; i++)
+    {
+        if(distances[i] <= median)
+        {
             memcpy(innerPoints + innerPointer * d, X + i*d, sizeof(double) * d);
             innerPoints[innerLength * d + innerPointer] = ids[i];
             innerPointer++;
         }
-        else{
+        else
+        {
             memcpy(outerPoints + outerPointer * d, X + i*d, sizeof(double) * d);
             outerPoints[outerLength * d + outerPointer] = ids[i];
             outerPointer++;
@@ -186,10 +203,12 @@ vptree * buildvp(double *X, int n, int d){
     stargs subArg[2];
 
     // Build subtrees in parallel or sequentially
-    if(parallelSub == true){
+    if(parallelSub == true)
+    {
 
         // Create threads
-        if(innerLength > 0){
+        if(innerLength > 0)
+        {
             threadActive[0] = true;
             subArg[0].d = d;
             subArg[0].n = innerLength;
@@ -199,7 +218,8 @@ vptree * buildvp(double *X, int n, int d){
             pthread_create(&subThread[0], NULL, buildvp_wrapper, (void *)&subArg[0]);
         }
 
-        if(outerLength > 0){
+        if(outerLength > 0)
+        {
             threadActive[1] = true;
             subArg[1].d = d;
             subArg[1].n = outerLength;
@@ -210,26 +230,34 @@ vptree * buildvp(double *X, int n, int d){
         }
 
         // Join threads
-        for(int i=0; i<2; i++){
-            if(threadActive[i] == true){
+        for(int i=0; i<2; i++)
+        {
+            if(threadActive[i] == true)
+            {
                 pthread_join(subThread[i], NULL);
             }
         }
 
-    }else{
-        if(innerLength > 0){
+    }
+    else
+    {
+        if(innerLength > 0)
+        {
             node->inner = buildvp(innerPoints, innerLength, d);
         }
-        if(outerLength > 0){
+        if(outerLength > 0)
+        {
             node->outer = buildvp(outerPoints, outerLength, d);
         }
     }
 
 
-    if(innerLength < 1){
+    if(innerLength < 1)
+    {
         node->inner = NULL;
     }
-    if(outerLength < 1){
+    if(outerLength < 1)
+    {
         node->outer= NULL;
     }
 
@@ -250,32 +278,38 @@ vptree * buildvp(double *X, int n, int d){
 }
 
 // Return vantage-point subtree with points inside radius
-vptree * getInner(vptree * T){
+vptree * getInner(vptree * T)
+{
     return T->inner;
 }
 
 // Return vantage-point subtree with points outside radius
-vptree * getOuter(vptree * T){
+vptree * getOuter(vptree * T)
+{
     return T->outer;
 }
 
 // Return median of distances to vantage point
-double getMD(vptree * T){
+double getMD(vptree * T)
+{
     return T->md;
 }
 
 // Return the coordinates of the vantage point
-double * getVP(vptree * T){
+double * getVP(vptree * T)
+{
     return T->vp;
 }
 
 // Return the index of the vantage point
-int getIDX(vptree * T){
+int getIDX(vptree * T)
+{
     return T->idx;
 }
 
 // Calculates the distances of all points from point and writes them to an array
-void *euclidean(void *arg){
+void *euclidean(void *arg)
+{
 
     // Retrieve variables by casting the argument to a dtarg struct pointer
     double *point = ((dtargs *) arg) -> point;
@@ -286,9 +320,11 @@ void *euclidean(void *arg){
 
     double accumulator = 0;
 
-    for (int i = 0; i < n; i++){
+    for (int i = 0; i < n; i++)
+    {
         accumulator = 0;
-        for (int j = 0; j < d; j++){
+        for (int j = 0; j < d; j++)
+        {
             accumulator += pow((point[j] - *(points + i * d + j)), 2);
         }
         distances[i] = sqrt(accumulator);
@@ -297,7 +333,8 @@ void *euclidean(void *arg){
 }
 
 // A utility function to swap two elements
-void swap(double *a, double *b){
+void swap(double *a, double *b)
+{
     double t = *a;
     *a = *b;
     *b = t;
@@ -305,7 +342,8 @@ void swap(double *a, double *b){
 
 // QuickSort Partition function
 // low and high are the range of indexes in arr where partition should work
-int partition (double arr[], int low, int high){
+int partition (double arr[], int low, int high)
+{
 
     // Select a pivot and initialize flag to position of smallest element before pivot
     double pivot = arr[high];
@@ -328,22 +366,27 @@ int partition (double arr[], int low, int high){
 }
 
 // Returns the median using the QuickSelect algorithm
-double quickselect_median(double arr[], int length){
+double quickselect_median(double arr[], int length)
+{
 
-    if (length % 2 == 1){
+    if (length % 2 == 1)
+    {
         return quickselect(arr, length, (length+1)/2);
     }
-    else{
+    else
+    {
         return 0.5 * (quickselect(arr, length, length/2) + quickselect(arr, length, length/2 + 1));
     }
 }
 
 // Returns the idx-th element of arr when arr is sorted
 // idx is the index (starting from 1) of the point we want to find when the array is sorted. For the median idx should be the middle one (i.e (length+1)/2 for odd lengths etc)
-double quickselect(double arr[], int length, int idx){
+double quickselect(double arr[], int length, int idx)
+{
 
     // Check to end recursion
-    if (length == 1){
+    if (length == 1)
+    {
         return arr[0];
     }
 
@@ -366,15 +409,18 @@ double quickselect(double arr[], int length, int idx){
     double result = 0;
 
     // This means that the point we're looking (median in our case) is in the lower partition
-    if (idx <= lowerLength){
+    if (idx <= lowerLength)
+    {
         result = quickselect(lower, lowerLength, idx);
     }
     // This means that the median is our pivot point
-    else if(idx == pivotIndex){
+    else if(idx == pivotIndex)
+    {
         result = pivot;
     }
     // This means that the median is in the higher partition
-    else{
+    else
+    {
         result = quickselect(higher, higherLength, idx - pivotIndex);
     }
 

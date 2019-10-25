@@ -22,14 +22,14 @@ double quickselect(double arr[], int length, int idx);
 // If it has it means that X is the points vector with an idx vector extended to id at the end
 bool runFlag = false;
 
-// Build the tree
+// Function that recursively builds the binary tree
 vptree * buildvp(double *X, int n, int d){
 
     // Allocate space for the index array
     double *ids = calloc(n, sizeof(double));
 
-    // If runFlag is 1 it means that we're not on the first execution and that X has an ids array at its end
-    // Else if we're on the first run we're going to generate the ids array
+    // If runFlag is true -> not first execution -> X has an ids array at its end
+    // Else if we're on the first run, we're going to generate the ids array
     if (runFlag == true){
         memcpy(ids, X + n * d, sizeof(double) * n);
     }
@@ -37,7 +37,8 @@ vptree * buildvp(double *X, int n, int d){
         for (int i = 0; i < n; i++)
             ids[i] = i;
     }
-    // Set flag
+	
+    // Set run flag to true
     runFlag = true;
 
     // Create node to be returned
