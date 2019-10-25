@@ -60,6 +60,13 @@ void *buildvp_wrapper(void *arg)
     return;
 }
 
+// Function to alter the live thread count
+void modThreadCount(int n){
+    pthread_mutex_lock( &threadMutex );
+    threadCount += n;
+    pthread_mutex_unlock( &threadMutex );
+}
+
 // Function that recursively builds the binary tree
 vptree * buildvp(double *X, int n, int d)
 {
@@ -122,9 +129,7 @@ vptree * buildvp(double *X, int n, int d)
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
     {
         // Increment live thread count
-        pthread_mutex_lock( &threadMutex );
-        threadCount += THREADS;
-        pthread_mutex_unlock( &threadMutex );
+        modThreadCount(THREADS);
 
         // Create threads
         for (int i = 0; i < THREADS; i++)
@@ -151,9 +156,7 @@ vptree * buildvp(double *X, int n, int d)
         for (int i = 0; i < THREADS; i++)
         {
             pthread_join(disThread[i], NULL);
-            pthread_mutex_lock( &threadMutex );
-            threadCount--;
-            pthread_mutex_unlock( &threadMutex );
+            modThreadCount(-1);
         }
     }
     else
@@ -222,14 +225,11 @@ vptree * buildvp(double *X, int n, int d)
     // Build subtrees in parallel or sequentially
     if((PARALLELSUB == true) && (THREADS_MAX - threadCount >= 2))
     {
-        // Increment live thread count
-        pthread_mutex_lock( &threadMutex );
-        threadCount += 2;
-        pthread_mutex_unlock( &threadMutex );
 
         // Create threads
         if(innerLength > 0)
         {
+            modThreadCount(1);
             threadActive[0] = true;
             subArg[0].d = d;
             subArg[0].n = innerLength;
@@ -241,6 +241,7 @@ vptree * buildvp(double *X, int n, int d)
 
         if(outerLength > 0)
         {
+            modThreadCount(1);
             threadActive[1] = true;
             subArg[1].d = d;
             subArg[1].n = outerLength;
@@ -256,9 +257,7 @@ vptree * buildvp(double *X, int n, int d)
             if(threadActive[i] == true)
             {
                 pthread_join(subThread[i], NULL);
-                pthread_mutex_lock( &threadMutex );
-                threadCount--;
-                pthread_mutex_unlock( &threadMutex );
+                modThreadCount(-1);
             }
         }
 
