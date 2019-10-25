@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
-#include <pthread.h>
 #include <omp.h>
 #include "../inc/vptree.h"
 
@@ -36,36 +35,12 @@ void *buildvp_wrapper(void *arg);
 bool runFlag = false;
 
 // Mutex and counter to keep track of live threads
-pthread_mutex_t threadMutex = PTHREAD_MUTEX_INITIALIZER;
 int threadCount = 0;
-
-// Struct used to pass arguments to threads for distance calculation
-typedef struct
-{
-    int tid, n, d;
-    double *point, *points, *distances;
-} dtargs;
-
-// Struct used to pass arguments to threads for subtree creation
-typedef struct
-{
-    int tid, n, d;
-    double *X;
-    vptree *subtree;
-} stargs;
-
-// Wrapper function to use buildvp() with pthreads
-void *buildvp_wrapper(void *arg)
-{
-    ((stargs *)arg)->subtree = buildvp(((stargs *)arg)->X, ((stargs *)arg)->n, ((stargs *)arg)->d);
-    return;
-}
 
 // Function to alter the live thread count
 void modThreadCount(int n){
-    pthread_mutex_lock( &threadMutex );
+    #pragma omp atomic
     threadCount += n;
-    pthread_mutex_unlock( &threadMutex );
 }
 
 // Function that recursively builds the binary tree
@@ -166,52 +141,29 @@ vptree * buildvp(double *X, int n, int d)
         }
     }
 
-    // Booleans to keep track whether a thread has been created to work on a subtree
-    bool threadActive[2];
-
-    // Thread and stargs arrays for parallel subtree threads
-    pthread_t subThread[2];
-    stargs subArg[2];
-
     // Build subtrees in parallel or sequentially
     if((PARALLELSUB == true) && (THREADS_MAX - threadCount >= 2))
     {
-
-        // Create threads
-        if(innerLength > 0)
+        modThreadCount(2);
+        #pragma omp parallel shared(node, d, innerPoints, innerLength, outerPoints, outerLength)
         {
-            modThreadCount(1);
-            threadActive[0] = true;
-            subArg[0].d = d;
-            subArg[0].n = innerLength;
-            subArg[0].subtree = node->inner;
-            subArg[0].tid = 0;
-            subArg[0].X = innerPoints;
-            pthread_create(&subThread[0], NULL, buildvp_wrapper, (void *)&subArg[0]);
-        }
-
-        if(outerLength > 0)
-        {
-            modThreadCount(1);
-            threadActive[1] = true;
-            subArg[1].d = d;
-            subArg[1].n = outerLength;
-            subArg[1].subtree = node->outer;
-            subArg[1].tid = 1;
-            subArg[1].X = outerPoints;
-            pthread_create(&subThread[1], NULL, buildvp_wrapper, (void *)&subArg[1]);
-        }
-
-        // Join threads and decrement live thread count
-        for(int i=0; i<2; i++)
-        {
-            if(threadActive[i] == true)
+            #pragma omp sections nowait
             {
-                pthread_join(subThread[i], NULL);
-                modThreadCount(-1);
+                // Create threads
+                #pragma omp section
+                if(innerLength > 0)
+                {
+                    node->inner = buildvp(innerPoints, innerLength, d);
+                }
+
+                #pragma omp section
+                if(outerLength > 0)
+                {
+                    node->outer = buildvp(outerPoints, outerLength, d);
+                }
             }
         }
-
+        modThreadCount(-2);
     }
     else
     {
@@ -290,6 +242,7 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
     int i;
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
     {
+        modThreadCount(THREADS);
         // Note that by removing the numthreads() clause, we can use OpenMP's default value which is usually = #CPU cores
         #pragma omp parallel shared(point, points, distances, n, d) private(i, accumulator) num_threads(THREADS)
         {
@@ -304,6 +257,7 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
                 distances[i] = sqrt(accumulator);
             }
         }
+        modThreadCount(-THREADS);
     }else{
         for (i = 0; i < n; i++)
         {
