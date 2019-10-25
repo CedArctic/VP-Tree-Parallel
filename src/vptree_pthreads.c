@@ -6,7 +6,15 @@
 #include <pthread.h>
 #include "../inc/vptree.h"
 
-#define THREADS 2
+// Number of threads in parallel distance calculation
+#define THREADS 4
+// Threshold of points to switch to sequential execution
+#define POINT_THRESHOLD 100
+// Threshold of maximum live threads simultaneously
+#define THREADS_MAX 100
+// Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
+#define PARALLELDIS true
+#define PARALLELSUB true
 
 // Function Prototypes
 vptree * buildvp(double *X, int n, int d);
@@ -25,9 +33,10 @@ void *buildvp_wrapper(void *arg);
 // Flag used to detect if build_vp has already been called. If it has not, X is the original input array.
 // If it has it means that X is the points vector with an idx vector extended to it at the end
 bool runFlag = false;
-// Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
-bool parallelDis = true;
-bool parallelSub = true;
+
+// Mutex and counter to keep track of live threads
+pthread_mutex_t threadMutex = PTHREAD_MUTEX_INITIALIZER;
+int threadCount = 0;
 
 // Struct used to pass arguments to threads for distance calculation
 typedef struct
@@ -110,8 +119,13 @@ vptree * buildvp(double *X, int n, int d)
 
     //TODO: Point number assignment per thread bellow can probably be done in a better way
     // Calculate distances in parallel if true, else do it sequentially
-    if(parallelDis == true)
+    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
     {
+        // Increment live thread count
+        pthread_mutex_lock( &threadMutex );
+        threadCount += THREADS;
+        pthread_mutex_unlock( &threadMutex );
+
         // Create threads
         for (int i = 0; i < THREADS; i++)
         {
@@ -133,10 +147,13 @@ vptree * buildvp(double *X, int n, int d)
             pthread_create(&disThread[i], NULL, euclidean, (void *)&disArg[i]);
         }
 
-        // Join threads
+        // Join threads and decrement live thread count
         for (int i = 0; i < THREADS; i++)
         {
             pthread_join(disThread[i], NULL);
+            pthread_mutex_lock( &threadMutex );
+            threadCount--;
+            pthread_mutex_unlock( &threadMutex );
         }
     }
     else
@@ -203,8 +220,12 @@ vptree * buildvp(double *X, int n, int d)
     stargs subArg[2];
 
     // Build subtrees in parallel or sequentially
-    if(parallelSub == true)
+    if((PARALLELSUB == true) && (THREADS_MAX - threadCount >= 2))
     {
+        // Increment live thread count
+        pthread_mutex_lock( &threadMutex );
+        threadCount += 2;
+        pthread_mutex_unlock( &threadMutex );
 
         // Create threads
         if(innerLength > 0)
@@ -229,12 +250,15 @@ vptree * buildvp(double *X, int n, int d)
             pthread_create(&subThread[1], NULL, buildvp_wrapper, (void *)&subArg[1]);
         }
 
-        // Join threads
+        // Join threads and decrement live thread count
         for(int i=0; i<2; i++)
         {
             if(threadActive[i] == true)
             {
                 pthread_join(subThread[i], NULL);
+                pthread_mutex_lock( &threadMutex );
+                threadCount--;
+                pthread_mutex_unlock( &threadMutex );
             }
         }
 
