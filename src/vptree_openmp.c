@@ -127,7 +127,10 @@ vptree * buildvp(double *X, int n, int d)
     int i;
 
     //TODO: Point number assignment per thread bellow can probably be done in a better way
+    //NOTE: Instead of parallelizing here using threads we could instead parallelize inside euclidean() using a work-sharing construct
     // Calculate distances in parallel if true, else do it sequentially
+    // This commented section of code is used with the non Work-Sharing version of euclidean. Work Sharing has better results consistently
+    /*
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
     {
         // Create threads
@@ -149,8 +152,8 @@ vptree * buildvp(double *X, int n, int d)
     else
     {
         euclidean(point, points, distances, n-1, d);
-    }
-
+    }*/
+    euclidean(point, points, distances, n-1, d);
 
     // At this point distances[i] indicates the distance of point i in points from the vantage point
     // Find median by creating a copy of distances and passing it to QuickSelect
@@ -311,7 +314,8 @@ int getIDX(vptree * T)
     return T->idx;
 }
 
-// Calculates the distances of all points from point and writes them to an array
+// This euclidean implementation is without Work Sharing. It can be used with normal thread parallelization in build_vp
+/*
 void euclidean(double *point, double *points, double *distances, int n, int d)
 {
 
@@ -325,6 +329,40 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
             accumulator += pow((point[j] - *(points + i * d + j)), 2);
         }
         distances[i] = sqrt(accumulator);
+    }
+    return;
+}*/
+// Calculates the distances of all points from point and writes them to an array. This implementation uses work-sharing
+void euclidean(double *point, double *points, double *distances, int n, int d)
+{
+
+    double accumulator = 0;
+    int i;
+    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
+    {
+        #pragma omp parallel shared(point, points, distances, n, d) private(i, accumulator)
+        {
+            #pragma omp for schedule(static) nowait
+            for (i = 0; i < n; i++)
+            {
+                accumulator = 0;
+                for (int j = 0; j < d; j++)
+                {
+                    accumulator += pow((point[j] - *(points + i * d + j)), 2);
+                }
+                distances[i] = sqrt(accumulator);
+            }
+        }
+    }else{
+        for (i = 0; i < n; i++)
+        {
+            accumulator = 0;
+            for (int j = 0; j < d; j++)
+            {
+                accumulator += pow((point[j] - *(points + i * d + j)), 2);
+            }
+            distances[i] = sqrt(accumulator);
+        }
     }
     return;
 }
