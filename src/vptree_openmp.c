@@ -8,7 +8,7 @@
 #include "../inc/vptree.h"
 
 // Number of threads in parallel distance calculation
-#define THREADS 4
+#define THREADS 8
 // Threshold of points to switch to sequential execution
 #define POINT_THRESHOLD 100
 // Threshold of maximum live threads simultaneously
@@ -119,40 +119,7 @@ vptree * buildvp(double *X, int n, int d)
     // Create array that holds euclidean distance of point from all other points
     double *distances = calloc(n-1, sizeof(double));
 
-    // Block size * threads = points number (n-1)
-    // blockSize = Points per thread
-    int blockSize = floor((float)(n-1) / THREADS);
-
-    // Variable to hold thread id in the parallel section bellow
-    int i;
-
-    //TODO: Point number assignment per thread bellow can probably be done in a better way
-    //NOTE: Instead of parallelizing here using threads we could instead parallelize inside euclidean() using a work-sharing construct
-    // Calculate distances in parallel if true, else do it sequentially
-    // This commented section of code is used with the non Work-Sharing version of euclidean. Work Sharing has better results consistently
-    /*
-    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
-    {
-        // Create threads
-        #pragma omp parallel num_threads(THREADS) private(i)
-        {
-            // Get thread number. Thread numbers range from 0 to THREADS-1
-            i = omp_get_thread_num();
-            // Check how many points to assign to each block. The last block gets the remaining points
-            if( i < THREADS - 1)
-            {
-                euclidean(point, points, distances + i * blockSize, blockSize, d);
-            }
-            else
-            {
-                euclidean(point, points, distances + i * blockSize, (n-1) - blockSize * i, d);
-            }
-        }
-    }
-    else
-    {
-        euclidean(point, points, distances, n-1, d);
-    }*/
+    // Calculate distances in parallel if possible using work-construct, else do it sequentially (logic in euclidean())
     euclidean(point, points, distances, n-1, d);
 
     // At this point distances[i] indicates the distance of point i in points from the vantage point
@@ -314,33 +281,17 @@ int getIDX(vptree * T)
     return T->idx;
 }
 
-// This euclidean implementation is without Work Sharing. It can be used with normal thread parallelization in build_vp
-/*
+// Calculates the distances of all points from point and writes them to an array. If possible use work-sharing to parallelize
 void euclidean(double *point, double *points, double *distances, int n, int d)
 {
 
-    double accumulator = 0;
-
-    for (int i = 0; i < n; i++)
-    {
-        accumulator = 0;
-        for (int j = 0; j < d; j++)
-        {
-            accumulator += pow((point[j] - *(points + i * d + j)), 2);
-        }
-        distances[i] = sqrt(accumulator);
-    }
-    return;
-}*/
-// Calculates the distances of all points from point and writes them to an array. This implementation uses work-sharing
-void euclidean(double *point, double *points, double *distances, int n, int d)
-{
-
+    // Since
     double accumulator = 0;
     int i;
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
     {
-        #pragma omp parallel shared(point, points, distances, n, d) private(i, accumulator)
+        // Note that by removing the numthreads() clause, we can use OpenMP's default value which is usually = #CPU cores
+        #pragma omp parallel shared(point, points, distances, n, d) private(i, accumulator) num_threads(THREADS)
         {
             #pragma omp for schedule(static) nowait
             for (i = 0; i < n; i++)
