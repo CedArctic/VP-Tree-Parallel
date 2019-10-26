@@ -34,10 +34,10 @@ void *buildvp_wrapper(void *arg);
 // If it has it means that X is the points vector with an idx vector extended to it at the end
 bool runFlag = false;
 
-// Mutex and counter to keep track of live threads
+// Counter to keep track of live threads
 int threadCount = 0;
 
-// Function to alter the live thread count
+// Thread-safe function to alter the live thread count
 void modThreadCount(int n){
     #pragma omp atomic
     threadCount += n;
@@ -46,6 +46,8 @@ void modThreadCount(int n){
 // Function that recursively builds the binary tree
 vptree * buildvp(double *X, int n, int d)
 {
+    // Enable OpenMP Nested Parallelism
+    omp_set_nested(true);
 
     // Allocate space for the index array
     double *ids = calloc(n, sizeof(double));
