@@ -131,18 +131,22 @@ vptree * buildvp(double *X, int n, int d){
     //TODO: Maybe assert that innerPointer == innerLength - 1 at this point
 
     // Assign node fields
-    if(innerLength > 0){
+    if((innerLength > 0) && (outerLength > 0)){
        node->inner = buildvp(innerPoints, innerLength, d);
+       node->outer = cilk_spawn buildvp(outerPoints, outerLength, d);
+       cilk_sync;
     }
-    else{
-        node->inner = NULL;
+    else if ((innerLength > 0) && !(outerLength > 0)){
+    	node->inner = buildvp(innerPoints, innerLength, d);
+    	node->outer = NULL;
     }
-
-    if(outerLength > 0){
-       node->outer = buildvp(outerPoints, outerLength, d);
-    }
+    else if (!(innerLength > 0) && (outerLength > 0)){
+    	node->outer = buildvp(outerPoints, outerLength, d);
+		node->inner = NULL;
+	}
     else{
         node->outer = NULL;
+        node->inner = NULL;
     }
     node->md = median;
     node->vp = point;
