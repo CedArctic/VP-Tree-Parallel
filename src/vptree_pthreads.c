@@ -216,7 +216,7 @@ vptree * buildvp(double *X, int n, int d)
     }
 
     // Booleans to keep track whether a thread has been created to work on a subtree
-    bool threadActive[2];
+    bool threadActive[2] = {false, false};
 
     // Thread and stargs arrays for parallel subtree threads
     pthread_t subThread[2];
