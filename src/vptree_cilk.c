@@ -24,7 +24,8 @@ vptree * getOuter(vptree * T);
 double getMD(vptree * T);
 double * getVP(vptree * T);
 int getIDX(vptree * T);
-void euclidean(double *point, double *points, double *distances, int n, int d);
+double * euclidean(double *point, double *points, int n, int d);
+void euclidean_parallel(double *point, double *points, double *distances, int n, int d);
 void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
 double quickselect_median(double arr[], int length);
@@ -184,8 +185,26 @@ int getIDX(vptree * T){
     return T->idx;
 }
 
+// Returns pointer to an array that contains the distances of all points from point
+double * euclidean(double *point, double *points, int n, int d){
+
+    double *distances = (double*)calloc(n, sizeof(double));
+
+    double accumulator = 0;
+
+    for (int i = 0; i < n; i++){
+        accumulator = 0;
+        for (int j = 0; j < d; j++){
+            //printf("Current (%d) points element: %.2f\n", i*d+j, *(points + i * d + j));
+            accumulator += pow((point[j] - *(points + i * d + j)), 2);
+        }
+        distances[i] = sqrt(accumulator);
+    }
+    return distances;
+}
+
 // Calculates the distances of all points from point and writes them to an array. If possible use Cilk Parallel Array operations
-void euclidean(double *point, double *points, double *distances, int n, int d)
+void euclidean_parallel(double *point, double *points, double *distances, int n, int d)
 {
 
     // Since
@@ -193,33 +212,32 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
 	// Accumulator array for parallel execution
     double *accumulator;
     // Accumulator for sequential execution
-    int accumulator_seq;
-    int i;
+    int accumulator_seq = 0;
+    accumulator = calloc(n * d , sizeof(double));
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
     {
 
-		cilk_for (i = 0; i < n; i++)
+    	//WARN: changing this for to cilk_for results in wrong results. Probably has to do with variable sharing accumulator
+		for (int i = 0; i < n; i++)
 		{
-			// Initialize accumulator vector to 0 for every new distance calculation
-			accumulator = calloc(d , sizeof(double));
-
 			// Vectorized calculations
-			accumulator[0:d] = point[0:d] - points[i*d:d];
-			accumulator[0:d] = pow(accumulator[0:d], 2);
+			accumulator[i*d:d] = point[0:d] - points[i*d:d];
+			accumulator[i*d:d] = pow(accumulator[i*d:d], 2);
 			// Use a reducer to sum up all elements of the accumulator vector and get its sqrt
-			distances[i] = sqrt(__sec_reduce_add (accumulator[0:d]));
-
+			distances[i] = sqrt(__sec_reduce_add (accumulator[i*d:d]));
 		}
 
 
     }else{
-        for (i = 0; i < n; i++)
+        for (int i = 0; i < n; i++)
         {
             accumulator_seq = 0;
             for (int j = 0; j < d; j++)
             {
                 accumulator_seq += pow((point[j] - *(points + i * d + j)), 2);
             }
+            //TODO: If the problem gets too big in size and accumulator values rise we will have to perform the sqrt operation
+            // on every iteration to avoid overflowing
             distances[i] = sqrt(accumulator_seq);
         }
     }
