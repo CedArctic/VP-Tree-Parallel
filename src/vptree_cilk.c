@@ -24,8 +24,7 @@ vptree * getOuter(vptree * T);
 double getMD(vptree * T);
 double * getVP(vptree * T);
 int getIDX(vptree * T);
-double * euclidean(double *point, double *points, int n, int d);
-void euclidean_parallel(double *point, double *points, double *distances, int n, int d);
+void euclidean(double *point, double *points, double *distances, int n, int d);
 void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
 double quickselect_median(double arr[], int length);
@@ -88,7 +87,7 @@ vptree * buildvp(double *X, int n, int d){
     double *distances = calloc(n-1, sizeof(double));
 
 	// Calculate distances in parallel if possible using work-construct, else do it sequentially (logic in euclidean())
-	euclidean_parallel(point, points, distances, n-1, d);
+	euclidean(point, points, distances, n-1, d);
 
     // At this point distances[i] indicates the distance of point i in points from the vantage point
     // Find median by creating a copy of distances and passing it to QuickSelect
@@ -185,26 +184,8 @@ int getIDX(vptree * T){
     return T->idx;
 }
 
-// Returns pointer to an array that contains the distances of all points from point
-double * euclidean(double *point, double *points, int n, int d){
-
-    double *distances = (double*)calloc(n, sizeof(double));
-
-    double accumulator = 0;
-
-    for (int i = 0; i < n; i++){
-        accumulator = 0;
-        for (int j = 0; j < d; j++){
-            //printf("Current (%d) points element: %.2f\n", i*d+j, *(points + i * d + j));
-            accumulator += pow((point[j] - *(points + i * d + j)), 2);
-        }
-        distances[i] = sqrt(accumulator);
-    }
-    return distances;
-}
-
 // Calculates the distances of all points from point and writes them to an array. If possible use Cilk Parallel Array operations
-void euclidean_parallel(double *point, double *points, double *distances, int n, int d)
+void euclidean(double *point, double *points, double *distances, int n, int d)
 {
 
     // Since
@@ -213,12 +194,10 @@ void euclidean_parallel(double *point, double *points, double *distances, int n,
     double *accumulator;
     // Accumulator for sequential execution
     int accumulator_seq = 0;
-    accumulator = calloc(n * d , sizeof(double));
+    accumulator = calloc(n * d, sizeof(double));
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
     {
-
-    	//WARN: changing this for to cilk_for results in wrong results. Probably has to do with variable sharing accumulator
-		for (int i = 0; i < n; i++)
+		cilk_for (int i = 0; i < n; i++)
 		{
 			// Vectorized calculations
 			accumulator[i*d:d] = point[0:d] - points[i*d:d];
@@ -226,7 +205,6 @@ void euclidean_parallel(double *point, double *points, double *distances, int n,
 			// Use a reducer to sum up all elements of the accumulator vector and get its sqrt
 			distances[i] = sqrt(__sec_reduce_add (accumulator[i*d:d]));
 		}
-
 
     }else{
         for (int i = 0; i < n; i++)
