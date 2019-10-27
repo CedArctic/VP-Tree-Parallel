@@ -7,12 +7,10 @@
 #include <cilk/cilk_api.h>
 #include "../inc/vptree.h"
 
-// Number of threads in parallel distance calculation
-#define THREADS 8
-// Threshold of points to switch to sequential execution
+// Number of threads for Cilk to use
+#define THREADS "8"
+// Threshold of points to switch to sequential execution - I recommend turning this off (setting to 0) and let cilk manage it
 #define POINT_THRESHOLD 100
-// Threshold of maximum live threads simultaneously
-#define THREADS_MAX 100
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
 #define PARALLELDIS true
 #define PARALLELSUB true
@@ -34,11 +32,11 @@ double quickselect(double arr[], int length, int idx);
 // If it has it means that X is the points vector with an idx vector extended to id at the end
 bool runFlag = false;
 
-// Counter to keep track of live threads
-int threadCount = 0;
-
 // Function that recursively builds the binary tree
 vptree * buildvp(double *X, int n, int d){
+
+	// Set number of threads. I recommend commenting this out and leaving Cilk to decide this
+	//__cilkrts_set_param("nworkers", THREADS_MAX);
 
     // Allocate space for the index array
     double *ids = calloc(n, sizeof(double));
@@ -79,9 +77,6 @@ vptree * buildvp(double *X, int n, int d){
     // Copy all other points to a new vector (i.e all of X from rows 1 to n-1)
     double *points = calloc((n-1) * d, sizeof(double));
     memcpy(points, X, sizeof(double) * d * (n-1));
-
-    // Create array that holds euclidean distance of point from all other points
-    //double *distances = euclidean(point, points, n-1, d);
 
     // Create array that holds euclidean distance of point from all other points
     double *distances = calloc(n-1, sizeof(double));
@@ -128,9 +123,7 @@ vptree * buildvp(double *X, int n, int d){
         }
     }
 
-    //TODO: Maybe assert that innerPointer == innerLength - 1 at this point
-
-    // Assign node fields
+    // Calculate (in parallel if possible) subtrees and assign node fields
     if((innerLength > 0) && (outerLength > 0)){
        node->inner = buildvp(innerPoints, innerLength, d);
        node->outer = cilk_spawn buildvp(outerPoints, outerLength, d);
@@ -191,15 +184,13 @@ int getIDX(vptree * T){
 // Calculates the distances of all points from point and writes them to an array. If possible use Cilk Parallel Array operations
 void euclidean(double *point, double *points, double *distances, int n, int d)
 {
-
-    // Since
-	//TODO: Add a thread counter(?). In cilk there isn't much of a point in counting threads
 	// Accumulator array for parallel execution
-    double *accumulator;
-    // Accumulator for sequential execution
+    double *accumulator = calloc(n * d, sizeof(double));
+    // Scalar accumulator for sequential execution
     int accumulator_seq = 0;
-    accumulator = calloc(n * d, sizeof(double));
-    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
+
+    // Decide if point calculation should happen in parallel or not
+    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true))
     {
 		cilk_for (int i = 0; i < n; i++)
 		{
