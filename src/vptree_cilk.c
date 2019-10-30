@@ -22,6 +22,7 @@ vptree * getOuter(vptree * T);
 double getMD(vptree * T);
 double * getVP(vptree * T);
 int getIDX(vptree * T);
+vptree * build_tree(double *X, int n, int d);
 void euclidean(double *point, double *points, double *distances, int n, int d);
 void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
@@ -32,8 +33,14 @@ double quickselect(double arr[], int length, int idx);
 // If it has it means that X is the points vector with an idx vector extended to id at the end
 bool runFlag = false;
 
-// Function that recursively builds the binary tree
-vptree * buildvp(double *X, int n, int d){
+// Application entry point
+vptree * buildvp(double *X, int n, int d)
+{
+    build_tree(X, n, d);
+}
+
+// Function that recursively builds the binary tree and returns a pointer to its root
+vptree * build_tree(double *X, int n, int d){
 
 	// Set number of threads. I recommend commenting this out and leaving Cilk to decide this
 	//__cilkrts_set_param("nworkers", THREADS_MAX);
@@ -50,7 +57,7 @@ vptree * buildvp(double *X, int n, int d){
         for (int i = 0; i < n; i++)
             ids[i] = i;
     }
-	
+
     // Set run flag to true
     runFlag = true;
 
@@ -125,16 +132,16 @@ vptree * buildvp(double *X, int n, int d){
 
     // Calculate (in parallel if possible) subtrees and assign node fields
     if((innerLength > 0) && (outerLength > 0)){
-       node->inner = buildvp(innerPoints, innerLength, d);
-       node->outer = cilk_spawn buildvp(outerPoints, outerLength, d);
-       cilk_sync;
+        node->outer = cilk_spawn build_tree(outerPoints, outerLength, d);
+        node->inner = build_tree(innerPoints, innerLength, d);
+        cilk_sync;
     }
     else if ((innerLength > 0) && !(outerLength > 0)){
-    	node->inner = buildvp(innerPoints, innerLength, d);
+    	node->inner = build_tree(innerPoints, innerLength, d);
     	node->outer = NULL;
     }
     else if (!(innerLength > 0) && (outerLength > 0)){
-    	node->outer = buildvp(outerPoints, outerLength, d);
+    	node->outer = build_tree(outerPoints, outerLength, d);
 		node->inner = NULL;
 	}
     else{

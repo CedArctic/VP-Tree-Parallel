@@ -23,12 +23,13 @@ vptree * getOuter(vptree * T);
 double getMD(vptree * T);
 double * getVP(vptree * T);
 int getIDX(vptree * T);
+vptree * build_tree(double *X, int n, int d);
 void *euclidean(void *arg);
 void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
 double quickselect_median(double arr[], int length);
 double quickselect(double arr[], int length, int idx);
-void *buildvp_wrapper(void *arg);
+void *build_tree_wrapper(void *arg);
 
 // Flag used to detect if build_vp has already been called. If it has not, X is the original input array.
 // If it has it means that X is the points vector with an idx vector extended to it at the end
@@ -53,10 +54,10 @@ typedef struct
     vptree *subtree;
 } stargs;
 
-// Wrapper function to use buildvp() with pthreads
-void *buildvp_wrapper(void *arg)
+// Wrapper function to use build_tree() with pthreads
+void *build_tree_wrapper(void *arg)
 {
-    ((stargs *)arg)->subtree = buildvp(((stargs *)arg)->X, ((stargs *)arg)->n, ((stargs *)arg)->d);
+    ((stargs *)arg)->subtree = build_tree(((stargs *)arg)->X, ((stargs *)arg)->n, ((stargs *)arg)->d);
     return;
 }
 
@@ -67,9 +68,14 @@ void modThreadCount(int n){
     pthread_mutex_unlock( &threadMutex );
 }
 
-// Function that recursively builds the binary tree
+// Application entry point
 vptree * buildvp(double *X, int n, int d)
 {
+    build_tree(X, n, d);
+}
+
+// Function that recursively builds the binary tree and returns a pointer to its root
+vptree * build_tree(double *X, int n, int d){
 
     // Allocate space for the index array
     double *ids = calloc(n, sizeof(double));
@@ -238,10 +244,10 @@ vptree * buildvp(double *X, int n, int d)
             subArg->subtree = node->inner;
             subArg->tid = 0;
             subArg->X = innerPoints;
-            pthread_create(&subThread, NULL, buildvp_wrapper, (void *)subArg);
+            pthread_create(&subThread, NULL, build_tree_wrapper, (void *)subArg);
 
             // Run outer tree creation in the main thread
-            buildvp(outerPoints, outerLength, d);
+            build_tree(outerPoints, outerLength, d);
 
             // Join thread
             pthread_join(subThread, NULL);
@@ -249,22 +255,22 @@ vptree * buildvp(double *X, int n, int d)
         }
         else if(innerLength > 0)
         {
-            buildvp(innerPoints, innerLength, d);
+            build_tree(innerPoints, innerLength, d);
         }
         else if(outerLength > 0)
         {
-            buildvp(outerPoints, outerLength, d);
+            build_tree(outerPoints, outerLength, d);
         }
     }
     else
     {
         if(innerLength > 0)
         {
-            node->inner = buildvp(innerPoints, innerLength, d);
+            node->inner = build_tree(innerPoints, innerLength, d);
         }
         if(outerLength > 0)
         {
-            node->outer = buildvp(outerPoints, outerLength, d);
+            node->outer = build_tree(outerPoints, outerLength, d);
         }
     }
 

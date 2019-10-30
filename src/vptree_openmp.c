@@ -23,12 +23,12 @@ vptree * getOuter(vptree * T);
 double getMD(vptree * T);
 double * getVP(vptree * T);
 int getIDX(vptree * T);
+vptree * build_tree(double *X, int n, int d);
 void euclidean(double *point, double *points, double *distances, int n, int d);
 void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
 double quickselect_median(double arr[], int length);
 double quickselect(double arr[], int length, int idx);
-void *buildvp_wrapper(void *arg);
 
 // Flag used to detect if build_vp has already been called. If it has not, X is the original input array.
 // If it has it means that X is the points vector with an idx vector extended to it at the end
@@ -43,8 +43,14 @@ void modThreadCount(int n){
     threadCount += n;
 }
 
-// Function that recursively builds the binary tree
+// Application entry point
 vptree * buildvp(double *X, int n, int d)
+{
+    build_tree(X, n, d);
+}
+
+// Function that recursively builds the binary tree and returns a pointer to its root
+vptree * build_tree(double *X, int n, int d)
 {
     // Enable OpenMP Nested Parallelism
     omp_set_nested(true);
@@ -155,13 +161,13 @@ vptree * buildvp(double *X, int n, int d)
                 #pragma omp section
                 if(innerLength > 0)
                 {
-                    node->inner = buildvp(innerPoints, innerLength, d);
+                    node->inner = build_tree(innerPoints, innerLength, d);
                 }
 
                 #pragma omp section
                 if(outerLength > 0)
                 {
-                    node->outer = buildvp(outerPoints, outerLength, d);
+                    node->outer = build_tree(outerPoints, outerLength, d);
                 }
             }
         }
@@ -171,11 +177,11 @@ vptree * buildvp(double *X, int n, int d)
     {
         if(innerLength > 0)
         {
-            node->inner = buildvp(innerPoints, innerLength, d);
+            node->inner = build_tree(innerPoints, innerLength, d);
         }
         if(outerLength > 0)
         {
-            node->outer = buildvp(outerPoints, outerLength, d);
+            node->outer = build_tree(outerPoints, outerLength, d);
         }
     }
 
@@ -239,17 +245,19 @@ int getIDX(vptree * T)
 void euclidean(double *point, double *points, double *distances, int n, int d)
 {
 
-    // Since
+    // Accumulator array for parallel execution
     double accumulator = 0;
-    int i;
+    //int i, j;
+
+    // Decide if point calculation should happen in parallel or not
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
     {
         modThreadCount(THREADS);
         // Note that by removing the numthreads() clause, we can use OpenMP's default value which is usually = #CPU cores
-        #pragma omp parallel shared(point, points, distances, n, d) private(i, accumulator) num_threads(THREADS)
+        #pragma omp parallel shared(point, points, distances, n, d) private(accumulator) num_threads(THREADS)
         {
             #pragma omp for schedule(static) nowait
-            for (i = 0; i < n; i++)
+            for (int i = 0; i < n; i++)
             {
                 accumulator = 0;
                 for (int j = 0; j < d; j++)
@@ -261,7 +269,7 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
         }
         modThreadCount(-THREADS);
     }else{
-        for (i = 0; i < n; i++)
+        for (int i = 0; i < n; i++)
         {
             accumulator = 0;
             for (int j = 0; j < d; j++)

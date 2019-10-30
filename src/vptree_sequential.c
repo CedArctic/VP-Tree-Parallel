@@ -12,6 +12,7 @@ vptree * getOuter(vptree * T);
 double getMD(vptree * T);
 double * getVP(vptree * T);
 int getIDX(vptree * T);
+vptree * build_tree(double *X, int n, int d);
 double * euclidean(double *point, double *points, int n, int d);
 void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
@@ -22,8 +23,15 @@ double quickselect(double arr[], int length, int idx);
 // If it has it means that X is the points vector with an idx vector extended to id at the end
 bool runFlag = false;
 
-// Function that recursively builds the binary tree
-vptree * buildvp(double *X, int n, int d){
+// Application entry point
+vptree * buildvp(double *X, int n, int d)
+{
+    build_tree(X, n, d);
+}
+
+// Function that recursively builds the binary tree and returns a pointer to its root
+vptree * build_tree(double *X, int n, int d)
+{
 
     // Allocate space for the index array
     double *ids = calloc(n, sizeof(double));
@@ -37,7 +45,7 @@ vptree * buildvp(double *X, int n, int d){
         for (int i = 0; i < n; i++)
             ids[i] = i;
     }
-	
+
     // Set run flag to true
     runFlag = true;
 
@@ -111,14 +119,14 @@ vptree * buildvp(double *X, int n, int d){
 
     // Assign node fields
     if(innerLength > 0){
-       node->inner = buildvp(innerPoints, innerLength, d);
+       node->inner = build_tree(innerPoints, innerLength, d);
     }
     else{
         node->inner = NULL;
     }
 
     if(outerLength > 0){
-       node->outer = buildvp(outerPoints, outerLength, d);
+       node->outer = build_tree(outerPoints, outerLength, d);
     }
     else{
         node->outer = NULL;
@@ -173,7 +181,6 @@ double * euclidean(double *point, double *points, int n, int d){
     for (int i = 0; i < n; i++){
         accumulator = 0;
         for (int j = 0; j < d; j++){
-            //printf("Current (%d) points element: %.2f\n", i*d+j, *(points + i * d + j));
             accumulator += pow((point[j] - *(points + i * d + j)), 2);
         }
         distances[i] = sqrt(accumulator);
