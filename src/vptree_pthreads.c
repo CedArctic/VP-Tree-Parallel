@@ -216,51 +216,45 @@ vptree * buildvp(double *X, int n, int d)
     }
 
     // Booleans to keep track whether a thread has been created to work on a subtree
-    bool threadActive[2] = {false, false};
+    bool threadActive = false;
 
     // Thread and stargs arrays for parallel subtree threads
-    pthread_t subThread[2];
-    stargs subArg[2];
+    pthread_t subThread;
+    stargs* subArg;
 
     // Build subtrees in parallel or sequentially
     if((PARALLELSUB == true) && (THREADS_MAX - threadCount >= 2))
     {
 
         // Create threads
-        if(innerLength > 0)
+        if((innerLength > 0) && (outerLength > 0))
         {
+            // Start inner tree creation on a thread
             modThreadCount(1);
-            threadActive[0] = true;
-            subArg[0].d = d;
-            subArg[0].n = innerLength;
-            subArg[0].subtree = node->inner;
-            subArg[0].tid = 0;
-            subArg[0].X = innerPoints;
-            pthread_create(&subThread[0], NULL, buildvp_wrapper, (void *)&subArg[0]);
-        }
+            subArg = malloc(sizeof(stargs));
+            threadActive = true;
+            subArg->d = d;
+            subArg->n = innerLength;
+            subArg->subtree = node->inner;
+            subArg->tid = 0;
+            subArg->X = innerPoints;
+            pthread_create(&subThread, NULL, buildvp_wrapper, (void *)subArg);
 
-        if(outerLength > 0)
+            // Run outer tree creation in the main thread
+            buildvp(outerPoints, outerLength, d);
+
+            // Join thread
+            pthread_join(subThread, NULL);
+            modThreadCount(-1);
+        }
+        else if(innerLength > 0)
         {
-            modThreadCount(1);
-            threadActive[1] = true;
-            subArg[1].d = d;
-            subArg[1].n = outerLength;
-            subArg[1].subtree = node->outer;
-            subArg[1].tid = 1;
-            subArg[1].X = outerPoints;
-            pthread_create(&subThread[1], NULL, buildvp_wrapper, (void *)&subArg[1]);
+            buildvp(innerPoints, innerLength, d);
         }
-
-        // Join threads and decrement live thread count
-        for(int i=0; i<2; i++)
+        else if(outerLength > 0)
         {
-            if(threadActive[i] == true)
-            {
-                pthread_join(subThread[i], NULL);
-                modThreadCount(-1);
-            }
+            buildvp(outerPoints, outerLength, d);
         }
-
     }
     else
     {
