@@ -6,12 +6,10 @@
 #include <pthread.h>
 #include "../inc/vptree.h"
 
-// Number of threads in parallel distance calculation
-#define THREADS 4
 // Threshold of points to switch to sequential execution
-#define POINT_THRESHOLD 100
+#define POINT_THRESHOLD 10000
 // Threshold of maximum live threads simultaneously
-#define THREADS_MAX 100
+#define THREADS_MAX 32
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
 #define PARALLELDIS true
 #define PARALLELSUB true
@@ -124,21 +122,40 @@ vptree * build_tree(double *X, int n, int d){
     // Create array that holds euclidean distance of point from all other points
     double *distances = calloc(n-1, sizeof(double));
 
-    // Block size * threads = points number (n-1)
-    pthread_t disThread[THREADS];
-    dtargs disArg[THREADS];
-    // blockSize = Points per thread
-    int blockSize = floor((float)(n-1) / THREADS);
+    // Dynamically decide number of threads for distance calculation
+    int threads = 1;
+    if(THREADS_MAX - threadCount >= 16){
+        threads = 16;
+    }
+    else if(THREADS_MAX - threadCount >= 8){
+        threads = 8;
+    }
+    else if(THREADS_MAX - threadCount >= 4){
+        threads = 4;
+    }
+    else if(THREADS_MAX - threadCount >= 2){
+        threads = 2;
+    }
 
-    //TODO: Point number assignment per thread bellow can probably be done in a better way
+    // Declare pointers for pthreads and argument structure arrays
+    pthread_t * disThread;
+    dtargs * disArg;
+
+    // Block size * threads = points number (n-1), blockSize = Points per thread
+    int blockSize = floor((float)(n-1) / threads);
+
     // Calculate distances in parallel if true, else do it sequentially
-    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
+    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (threads > 1))
     {
         // Increment live thread count
-        modThreadCount(THREADS);
+        modThreadCount(threads);
+
+        // Allocate memory for threads
+        disThread = calloc(threads, sizeof(pthread_t));
+        disArg = calloc(threads, sizeof(dtargs));
 
         // Create threads
-        for (int i = 0; i < THREADS; i++)
+        for (int i = 0; i < threads; i++)
         {
             disArg[i].d = d;
             disArg[i].point = point;
@@ -147,7 +164,7 @@ vptree * build_tree(double *X, int n, int d){
             disArg[i].distances = distances + i * blockSize;
 
             // Check how many points to assign to each block. The last block gets the remaining points
-            if( i < THREADS - 1)
+            if( i < threads - 1)
             {
                 disArg[i].n = blockSize;
             }
@@ -159,14 +176,16 @@ vptree * build_tree(double *X, int n, int d){
         }
 
         // Join threads and decrement live thread count
-        for (int i = 0; i < THREADS; i++)
+        for (int i = 0; i < threads; i++)
         {
             pthread_join(disThread[i], NULL);
             modThreadCount(-1);
         }
+        free(disThread);
     }
     else
     {
+        disArg = calloc(1, sizeof(dtargs));
         disArg[0].d = d;
         disArg[0].point = point;
         disArg[0].tid = 0;
@@ -175,7 +194,8 @@ vptree * build_tree(double *X, int n, int d){
         disArg[0].distances = distances;
         euclidean((void *)&disArg[0]);
     }
-
+    // Free memory
+    free(disArg);
 
     // At this point distances[i] indicates the distance of point i in points from the vantage point
     // Find median by creating a copy of distances and passing it to QuickSelect
