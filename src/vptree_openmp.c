@@ -6,12 +6,10 @@
 #include <omp.h>
 #include "../inc/vptree.h"
 
-// Number of threads in parallel distance calculation
-#define THREADS 8
 // Threshold of points to switch to sequential execution
-#define POINT_THRESHOLD 100
+#define POINT_THRESHOLD 10000
 // Threshold of maximum live threads simultaneously
-#define THREADS_MAX 100
+#define THREADS_MAX 32
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
 #define PARALLELDIS true
 #define PARALLELSUB true
@@ -23,16 +21,12 @@ vptree * getOuter(vptree * T);
 double getMD(vptree * T);
 double * getVP(vptree * T);
 int getIDX(vptree * T);
-vptree * build_tree(double *X, int n, int d);
+vptree * build_tree(double *points, int *ids, int n, int d);
 void euclidean(double *point, double *points, double *distances, int n, int d);
 void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
 double quickselect_median(double arr[], int length);
 double quickselect(double arr[], int length, int idx);
-
-// Flag used to detect if build_vp has already been called. If it has not, X is the original input array.
-// If it has it means that X is the points vector with an idx vector extended to it at the end
-bool runFlag = false;
 
 // Counter to keep track of live threads
 int threadCount = 0;
@@ -46,58 +40,47 @@ void modThreadCount(int n){
 // Application entry point
 vptree * buildvp(double *X, int n, int d)
 {
-    build_tree(X, n, d);
+    // Allocate space for the index array
+    int *ids = calloc(n, sizeof(int));
+
+    // Build the initial ids array
+    for (int i = 0; i < n; i++)
+        ids[i] = i;
+
+    // Call build_tree to get the pointer to the root of the tree
+    return build_tree(X, ids, n, d);
 }
 
 // Function that recursively builds the binary tree and returns a pointer to its root
-vptree * build_tree(double *X, int n, int d)
+vptree * build_tree(double *points, int *ids, int n, int d)
 {
     // Enable OpenMP Nested Parallelism
     omp_set_nested(true);
-
-    // Allocate space for the index array
-    double *ids = calloc(n, sizeof(double));
-
-    // If runFlag is true -> not first execution -> X has an ids array at its end
-    // Else if we're on the first run, we're going to generate the ids array
-    if (runFlag == true)
-    {
-        memcpy(ids, X + n * d, sizeof(double) * n);
-    }
-    else
-    {
-        for (int i = 0; i < n; i++)
-            ids[i] = i;
-    }
-
-    // Set run flag to true
-    runFlag = true;
 
     // Create node to be returned
     vptree *node = calloc(1, sizeof(vptree));
 
     // Check to end recursion: if points array is of size 0 - we are returning a leaf
-    if (n == 1)
-    {
+    if (n == 1){
+        // Build node
         node->inner = NULL;
         node->outer = NULL;
         node->idx = ids[0];
         node->md = 0;
         node->vp = calloc(d, sizeof(double));
-        memcpy(node->vp, X, sizeof(double) * d);
+        memcpy(node->vp, points, sizeof(double) * d);
+
+        // Free memory for ids and points arrays
+        free(ids);
+        free(points);
+
+        // Return node
         return node;
     }
 
     // Choose the last point in X as the vantage point
-    double *point = calloc(d, sizeof(double));
-    double id = ids[n-1];
-
-    // Copy the point from the original matrix to a new vector
-    memcpy(point, (X + (n-1)*d), sizeof(double) * d);
-
-    // Copy all other points to a new vector (i.e all of X from rows 1 to n-1)
-    double *points = calloc((n-1) * d, sizeof(double));
-    memcpy(points, X, sizeof(double) * d * (n-1));
+    double *point = (points + (n-1)*d);
+    int id = ids[n-1];
 
     // Create array that holds euclidean distance of point from all other points
     double *distances = calloc(n-1, sizeof(double));
@@ -129,22 +112,21 @@ vptree * build_tree(double *X, int n, int d)
     int outerPointer = 0;
 
     // Create arrays for inner and outer points. Arrays contain the points and a list of ids (one for each point)
-    double *innerPoints = calloc(innerLength * d + innerLength, sizeof(double));
-    double *outerPoints = calloc(outerLength * d + outerLength, sizeof(double));
+    double *innerPoints = calloc(innerLength * d, sizeof(double));
+    double *outerPoints = calloc(outerLength * d, sizeof(double));
+    int *innerIDs = calloc(innerLength, sizeof(int));
+    int *outerIDs = calloc(outerLength, sizeof(int));
 
     // Sort points
-    for (int i = 0; i < n-1; i++)
-    {
-        if(distances[i] <= median)
-        {
-            memcpy(innerPoints + innerPointer * d, X + i*d, sizeof(double) * d);
-            innerPoints[innerLength * d + innerPointer] = ids[i];
+    for (int i = 0; i < n-1; i++){
+        if(distances[i] <= median){
+            memcpy(innerPoints + innerPointer * d, points + i*d, sizeof(double) * d);
+            innerIDs[innerPointer] = ids[i];
             innerPointer++;
         }
-        else
-        {
-            memcpy(outerPoints + outerPointer * d, X + i*d, sizeof(double) * d);
-            outerPoints[outerLength * d + outerPointer] = ids[i];
+        else{
+            memcpy(outerPoints + outerPointer * d, points + i*d, sizeof(double) * d);
+            outerIDs[outerPointer] = ids[i];
             outerPointer++;
         }
     }
@@ -161,13 +143,13 @@ vptree * build_tree(double *X, int n, int d)
                 #pragma omp section
                 if(innerLength > 0)
                 {
-                    node->inner = build_tree(innerPoints, innerLength, d);
+                    node->inner = build_tree(innerPoints, innerIDs, innerLength, d);
                 }
 
                 #pragma omp section
                 if(outerLength > 0)
                 {
-                    node->outer = build_tree(outerPoints, outerLength, d);
+                    node->outer = build_tree(outerPoints, outerIDs, outerLength, d);
                 }
             }
         }
@@ -177,11 +159,11 @@ vptree * build_tree(double *X, int n, int d)
     {
         if(innerLength > 0)
         {
-            node->inner = build_tree(innerPoints, innerLength, d);
+            node->inner = build_tree(innerPoints, innerIDs, innerLength, d);
         }
         if(outerLength > 0)
         {
-            node->outer = build_tree(outerPoints, outerLength, d);
+            node->outer = build_tree(outerPoints, outerIDs, outerLength, d);
         }
     }
 
@@ -204,8 +186,6 @@ vptree * build_tree(double *X, int n, int d)
     free(points);
     free(distances);
     free(distancesCopy);
-    free(innerPoints);
-    free(outerPoints);
     free(ids);
 
     return node;
@@ -244,17 +224,17 @@ int getIDX(vptree * T)
 // Calculates the distances of all points from point and writes them to an array. If possible use work-sharing to parallelize
 void euclidean(double *point, double *points, double *distances, int n, int d)
 {
-
     // Accumulator array for parallel execution
     double accumulator = 0;
-    //int i, j;
+
+    // Enable dynamic threads allocation
+    omp_set_dynamic(1);
 
     // Decide if point calculation should happen in parallel or not
-    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (THREADS <= THREADS_MAX - threadCount))
+    if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true))
     {
-        modThreadCount(THREADS);
-        // Note that by removing the numthreads() clause, we can use OpenMP's default value which is usually = #CPU cores
-        #pragma omp parallel shared(point, points, distances, n, d) private(accumulator) num_threads(THREADS)
+
+        #pragma omp parallel shared(point, points, distances, n, d) private(accumulator)
         {
             #pragma omp for schedule(static) nowait
             for (int i = 0; i < n; i++)
@@ -267,7 +247,7 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
                 distances[i] = sqrt(accumulator);
             }
         }
-        modThreadCount(-THREADS);
+
     }else{
         for (int i = 0; i < n; i++)
         {

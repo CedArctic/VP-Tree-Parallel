@@ -36,7 +36,6 @@ vptree * buildvp(double *X, int n, int d)
 // Function that recursively builds the binary tree and returns a pointer to its root
 vptree * build_tree(double *points, int *ids, int n, int d)
 {
-
     // Create node to be returned
     vptree *node = calloc(1, sizeof(vptree));
 
