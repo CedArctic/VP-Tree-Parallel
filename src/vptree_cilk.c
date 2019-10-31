@@ -22,68 +22,57 @@ vptree * getOuter(vptree * T);
 double getMD(vptree * T);
 double * getVP(vptree * T);
 int getIDX(vptree * T);
-vptree * build_tree(double *X, int n, int d);
+vptree * build_tree(double *points, int *ids, int n, int d);
 void euclidean(double *point, double *points, double *distances, int n, int d);
 void swap(double *a, double *b);
 int partition (double arr[], int low, int high);
 double quickselect_median(double arr[], int length);
 double quickselect(double arr[], int length, int idx);
 
-// Used to detect if build_vp has already been called. If it has not, X is the original input array.
-// If it has it means that X is the points vector with an idx vector extended to id at the end
-bool runFlag = false;
-
 // Application entry point
 vptree * buildvp(double *X, int n, int d)
 {
-    build_tree(X, n, d);
+    // Allocate space for the index array
+    int *ids = calloc(n, sizeof(int));
+
+    // Build the initial ids array
+    for (int i = 0; i < n; i++)
+        ids[i] = i;
+
+    // Call build_tree to get the pointer to the root of the tree
+    return build_tree(X, ids, n, d);
 }
 
 // Function that recursively builds the binary tree and returns a pointer to its root
-vptree * build_tree(double *X, int n, int d){
-
+vptree * build_tree(double *points, int *ids, int n, int d)
+{
 	// Set number of threads. I recommend commenting this out and leaving Cilk to decide this
 	//__cilkrts_set_param("nworkers", THREADS_MAX);
-
-    // Allocate space for the index array
-    double *ids = calloc(n, sizeof(double));
-
-    // If runFlag is true -> not first execution -> X has an ids array at its end
-    // Else if we're on the first run, we're going to generate the ids array
-    if (runFlag == true){
-        memcpy(ids, X + n * d, sizeof(double) * n);
-    }
-    else{
-        for (int i = 0; i < n; i++)
-            ids[i] = i;
-    }
-
-    // Set run flag to true
-    runFlag = true;
 
     // Create node to be returned
     vptree *node = calloc(1, sizeof(vptree));
 
     // Check to end recursion: if points array is of size 0 - we are returning a leaf
     if (n == 1){
+        // Build node
         node->inner = NULL;
         node->outer = NULL;
         node->idx = ids[0];
         node->md = 0;
         node->vp = calloc(d, sizeof(double));
-        memcpy(node->vp, X, sizeof(double) * d);
+        memcpy(node->vp, points, sizeof(double) * d);
+
+        // Free memory for ids and points arrays
+        free(ids);
+        free(points);
+
+        // Return node
         return node;
     }
 
     // Choose the last point in X as the vantage point
-    double *point = calloc(d, sizeof(double));
+    double *point = (points + (n-1)*d);
     double id = ids[n-1];
-    // Copy the point from the original matrix to a new vector
-    memcpy(point, (X + (n-1)*d), sizeof(double) * d);
-
-    // Copy all other points to a new vector (i.e all of X from rows 1 to n-1)
-    double *points = calloc((n-1) * d, sizeof(double));
-    memcpy(points, X, sizeof(double) * d * (n-1));
 
     // Create array that holds euclidean distance of point from all other points
     double *distances = calloc(n-1, sizeof(double));
@@ -113,35 +102,37 @@ vptree * build_tree(double *X, int n, int d){
     int outerPointer = 0;
 
     // Create arrays for inner and outer points. Arrays contain the points and a list of ids (one for each point)
-    double *innerPoints = calloc(innerLength * d + innerLength, sizeof(double));
-    double *outerPoints = calloc(outerLength * d + outerLength, sizeof(double));
+    double *innerPoints = calloc(innerLength * d, sizeof(double));
+    double *outerPoints = calloc(outerLength * d, sizeof(double));
+    int *innerIDs = calloc(innerLength, sizeof(int));
+    int *outerIDs = calloc(outerLength, sizeof(int));
 
     // Sort points
     for (int i = 0; i < n-1; i++){
         if(distances[i] <= median){
-            memcpy(innerPoints + innerPointer * d, X + i*d, sizeof(double) * d);
-            innerPoints[innerLength * d + innerPointer] = ids[i];
+            memcpy(innerPoints + innerPointer * d, points + i*d, sizeof(double) * d);
+            innerIDs[innerPointer] = ids[i];
             innerPointer++;
         }
         else{
-            memcpy(outerPoints + outerPointer * d, X + i*d, sizeof(double) * d);
-            outerPoints[outerLength * d + outerPointer] = ids[i];
+            memcpy(outerPoints + outerPointer * d, points + i*d, sizeof(double) * d);
+            outerIDs[outerPointer] = ids[i];
             outerPointer++;
         }
     }
 
     // Calculate (in parallel if possible) subtrees and assign node fields
     if((innerLength > 0) && (outerLength > 0)){
-        node->outer = cilk_spawn build_tree(outerPoints, outerLength, d);
-        node->inner = build_tree(innerPoints, innerLength, d);
+        node->outer = cilk_spawn build_tree(outerPoints, outerIDs, outerLength, d);
+        node->inner = build_tree(innerPoints, innerIDs, innerLength, d);
         cilk_sync;
     }
     else if ((innerLength > 0) && !(outerLength > 0)){
-    	node->inner = build_tree(innerPoints, innerLength, d);
+    	node->inner = build_tree(innerPoints, innerIDs,innerLength, d);
     	node->outer = NULL;
     }
     else if (!(innerLength > 0) && (outerLength > 0)){
-    	node->outer = build_tree(outerPoints, outerLength, d);
+    	node->outer = build_tree(outerPoints, outerIDs, outerLength, d);
 		node->inner = NULL;
 	}
     else{
@@ -156,8 +147,6 @@ vptree * build_tree(double *X, int n, int d){
     free(points);
     free(distances);
     free(distancesCopy);
-    free(innerPoints);
-    free(outerPoints);
     free(ids);
 
     return node;
@@ -221,6 +210,8 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
             distances[i] = sqrt(accumulator_seq);
         }
     }
+
+    free(accumulator);
     return;
 }
 
