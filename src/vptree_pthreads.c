@@ -258,7 +258,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
             pthread_create(&subThread, NULL, build_tree_wrapper, (void *)subArg);
 
             // Run outer tree creation in the main thread
-            build_tree(outerPoints, outerIDs, outerLength, d);
+            node->outer = build_tree(outerPoints, outerIDs, outerLength, d);
 
             // Join thread
             pthread_join(subThread, NULL);
@@ -266,11 +266,11 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         }
         else if(innerLength > 0)
         {
-            build_tree(innerPoints, innerIDs, innerLength, d);
+        	node->inner = build_tree(innerPoints, innerIDs, innerLength, d);
         }
         else if(outerLength > 0)
         {
-            build_tree(outerPoints, outerIDs, outerLength, d);
+        	node->outer = build_tree(outerPoints, outerIDs, outerLength, d);
         }
     }
     else
