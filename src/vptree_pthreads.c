@@ -297,9 +297,10 @@ vptree * build_tree(double *points, int *ids, int n, int d)
 
 
     node->md = median;
-    node->vp = point;
+    // Copy the point into vp because we will call free(points) that will also free(point)
+    node->vp = calloc(d, sizeof(double));
+    memcpy(node->vp, point, sizeof(double) * d);
     node->idx = id;
-    //printf("Assigning id %d to for node: %d\n", id, node->idx);
 
     // De-allocate unused memory
     free(points);

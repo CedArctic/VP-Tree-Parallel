@@ -109,7 +109,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
 
     // Sort points
     for (int i = 0; i < n-1; i++){
-        if(distances[i] <= median){
+        if(!(distances[i] > median)){
             memcpy(innerPoints + innerPointer * d, points + i*d, sizeof(double) * d);
             innerIDs[innerPointer] = ids[i];
             innerPointer++;
@@ -140,7 +140,9 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         node->inner = NULL;
     }
     node->md = median;
-    node->vp = point;
+    // Copy the point into vp because we will call free(points) that will also free(point)
+    node->vp = calloc(d, sizeof(double));
+    memcpy(node->vp, point, sizeof(double) * d);
     node->idx = id;
 
     // De-allocate unused memory
