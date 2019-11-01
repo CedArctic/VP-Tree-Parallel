@@ -10,7 +10,7 @@
 // Number of threads for Cilk to use
 #define THREADS "8"
 // Threshold of points to switch to sequential execution - I recommend turning this off (setting to 0) and let cilk manage it
-#define POINT_THRESHOLD 100
+#define POINT_THRESHOLD 0
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
 #define PARALLELDIS true
 #define PARALLELSUB true
@@ -184,13 +184,15 @@ int getIDX(vptree * T){
 void euclidean(double *point, double *points, double *distances, int n, int d)
 {
 	// Accumulator array for parallel execution
-    double *accumulator = calloc(n * d, sizeof(double));
+    double *accumulator;
     // Scalar accumulator for sequential execution
     int accumulator_seq = 0;
 
     // Decide if point calculation should happen in parallel or not
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true))
     {
+    	accumulator = calloc(n * d, sizeof(double));
+
 		cilk_for (int i = 0; i < n; i++)
 		{
 			// Vectorized calculations
@@ -199,6 +201,7 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
 			// Use a reducer to sum up all elements of the accumulator vector and get its sqrt
 			distances[i] = sqrt(__sec_reduce_add (accumulator[i*d:d]));
 		}
+	    free(accumulator);
 
     }else{
         for (int i = 0; i < n; i++)
@@ -213,8 +216,6 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
             distances[i] = sqrt(accumulator_seq);
         }
     }
-
-    free(accumulator);
     return;
 }
 
