@@ -109,7 +109,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
 
     // Sort points
     for (int i = 0; i < n-1; i++){
-        if(!(distances[i] > median)){
+        if(distances[i] <= median){
             memcpy(innerPoints + innerPointer * d, points + i*d, sizeof(double) * d);
             innerIDs[innerPointer] = ids[i];
             innerPointer++;
