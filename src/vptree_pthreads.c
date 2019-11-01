@@ -190,6 +190,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     double *distancesCopy = calloc(n-1, sizeof(double));
     memcpy(distancesCopy, distances, sizeof(double) * (n-1));
     double median = quickselect_median(distancesCopy, n-1);
+    free(distancesCopy);
 
     // Sort points into two new arrays
     // Calculate array sizes for subtrees. Values up to and equal to the median go on the inner tree
@@ -230,6 +231,17 @@ vptree * build_tree(double *points, int *ids, int n, int d)
             outerPointer++;
         }
     }
+
+    node->md = median;
+    // Copy the point into vp because we will call free(points) that will also free(point)
+    node->vp = calloc(d, sizeof(double));
+    memcpy(node->vp, point, sizeof(double) * d);
+    node->idx = id;
+
+    // De-allocate unused memory
+    free(points);
+    free(distances);
+    free(ids);
 
     // Booleans to keep track whether a thread has been created to work on a subtree
     bool threadActive = false;
@@ -294,19 +306,6 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     {
         node->outer= NULL;
     }
-
-
-    node->md = median;
-    // Copy the point into vp because we will call free(points) that will also free(point)
-    node->vp = calloc(d, sizeof(double));
-    memcpy(node->vp, point, sizeof(double) * d);
-    node->idx = id;
-
-    // De-allocate unused memory
-    free(points);
-    free(distances);
-    free(distancesCopy);
-    free(ids);
 
     return node;
 }
