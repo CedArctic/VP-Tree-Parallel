@@ -46,13 +46,13 @@ typedef struct
     int tid, n, d;
     double *points;
     int *ids;
-    vptree *subtree;
+    vptree **subtree;
 } stargs;
 
 // Wrapper function to use build_tree() with pthreads
 void *build_tree_wrapper(void *arg)
 {
-    ((stargs *)arg)->subtree = build_tree(((stargs *)arg)->points, ((stargs *)arg)->ids, ((stargs *)arg)->n, ((stargs *)arg)->d);
+    *((stargs *)arg)->subtree = build_tree(((stargs *)arg)->points, ((stargs *)arg)->ids, ((stargs *)arg)->n, ((stargs *)arg)->d);
     return;
 }
 
@@ -251,7 +251,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
             threadActive = true;
             subArg->d = d;
             subArg->n = innerLength;
-            subArg->subtree = node->inner;
+            subArg->subtree = &node->inner;
             subArg->tid = 0;
             subArg->points = innerPoints;
             subArg->ids = innerIDs;
@@ -299,6 +299,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     node->md = median;
     node->vp = point;
     node->idx = id;
+    //printf("Assigning id %d to for node: %d\n", id, node->idx);
 
     // De-allocate unused memory
     free(points);
