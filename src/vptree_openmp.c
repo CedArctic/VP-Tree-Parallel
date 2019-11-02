@@ -8,8 +8,8 @@
 
 // Threshold of points to switch to sequential execution
 #define POINT_THRESHOLD 10000
-// Threshold of maximum live threads simultaneously
-#define THREADS_MAX 32
+// Threshold of maximum live threads simultaneously for distance calculation
+#define THREADS_MAX 16
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
 #define PARALLELDIS true
 #define PARALLELSUB true
@@ -147,7 +147,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     if((PARALLELSUB == true) && (THREADS_MAX - threadCount >= 2))
     {
         modThreadCount(2);
-        #pragma omp parallel shared(node, d, innerPoints, innerLength, outerPoints, outerLength)
+        #pragma omp parallel shared(node)
         {
             #pragma omp sections nowait
             {
@@ -235,15 +235,15 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true))
     {
 
-        #pragma omp parallel shared(point, points, distances, n, d) private(accumulator)
+        #pragma omp parallel private(accumulator)
         {
-            #pragma omp for schedule(static) nowait
+            #pragma omp for schedule(auto) nowait
             for (int i = 0; i < n; i++)
             {
                 accumulator = 0;
                 for (int j = 0; j < d; j++)
                 {
-                    accumulator += pow((point[j] - *(points + i * d + j)), 2);
+                    accumulator += (point[j] - *(points + i * d + j)) * (point[j] - *(points + i * d + j));
                 }
                 distances[i] = sqrt(accumulator);
             }
@@ -255,7 +255,7 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
             accumulator = 0;
             for (int j = 0; j < d; j++)
             {
-                accumulator += pow((point[j] - *(points + i * d + j)), 2);
+                accumulator += (point[j] - *(points + i * d + j)) * (point[j] - *(points + i * d + j));
             }
             distances[i] = sqrt(accumulator);
         }

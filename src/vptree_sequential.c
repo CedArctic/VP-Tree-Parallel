@@ -171,7 +171,7 @@ double * euclidean(double *point, double *points, int n, int d){
     for (int i = 0; i < n; i++){
         accumulator = 0;
         for (int j = 0; j < d; j++){
-            accumulator += pow((point[j] - *(points + i * d + j)), 2);
+            accumulator += (point[j] - *(points + i * d + j)) * (point[j] - *(points + i * d + j));
         }
         distances[i] = sqrt(accumulator);
     }

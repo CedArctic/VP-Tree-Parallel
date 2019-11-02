@@ -7,9 +7,9 @@
 #include "../inc/vptree.h"
 
 // Threshold of points to switch to sequential execution
-#define POINT_THRESHOLD 10000
+#define POINT_THRESHOLD 1000
 // Threshold of maximum live threads simultaneously
-#define THREADS_MAX 32
+#define THREADS_MAX 16
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
 #define PARALLELDIS true
 #define PARALLELSUB true
@@ -110,19 +110,19 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     // Create array that holds euclidean distance of point from all other points
     double *distances = calloc(n-1, sizeof(double));
 
-    // Dynamically decide number of threads for distance calculation
+    // Dynamically decide number of threads for distance calculation - Play with these values to optimize
     int threads = 1;
     if(THREADS_MAX - threadCount >= 16){
         threads = 16;
     }
     else if(THREADS_MAX - threadCount >= 8){
-        threads = 8;
-    }
-    else if(THREADS_MAX - threadCount >= 4){
         threads = 4;
     }
-    else if(THREADS_MAX - threadCount >= 2){
+    else if(THREADS_MAX - threadCount >= 4){
         threads = 2;
+    }
+    else if(THREADS_MAX - threadCount >= 2){
+        threads = 1;
     }
 
     // Declare pointers for pthreads and argument structure arrays
@@ -136,35 +136,35 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     if((n-1 > POINT_THRESHOLD) && (PARALLELDIS == true) && (threads > 1))
     {
         // Increment live thread count
-        modThreadCount(threads);
+        modThreadCount(threads - 1);
 
         // Allocate memory for threads
-        disThread = calloc(threads, sizeof(pthread_t));
+        disThread = calloc(threads - 1, sizeof(pthread_t));
         disArg = calloc(threads, sizeof(dtargs));
 
         // Create threads
-        for (int i = 0; i < threads; i++)
+        for (int i = 0; i < threads - 1; i++)
         {
             disArg[i].d = d;
             disArg[i].point = point;
             disArg[i].tid = i;
             disArg[i].points = points + i * blockSize * d;
             disArg[i].distances = distances + i * blockSize;
-
-            // Check how many points to assign to each block. The last block gets the remaining points
-            if( i < threads - 1)
-            {
-                disArg[i].n = blockSize;
-            }
-            else
-            {
-                disArg[i].n = (n-1) - blockSize * i;
-            }
+            disArg[i].n = blockSize;
             pthread_create(&disThread[i], NULL, euclidean, (void *)&disArg[i]);
         }
 
+        // Work for the main thread
+        disArg[threads - 1].d = d;
+        disArg[threads - 1].point = point;
+        disArg[threads - 1].tid = threads - 1;
+        disArg[threads - 1].points = points + (threads - 1) * blockSize * d;
+        disArg[threads - 1].distances = distances + (threads - 1) * blockSize;
+        disArg[threads - 1].n = (n-1) - blockSize * (threads - 1);
+        euclidean((void *)&disArg[threads - 1]);
+
         // Join threads and decrement live thread count
-        for (int i = 0; i < threads; i++)
+        for (int i = 0; i < threads - 1; i++)
         {
             pthread_join(disThread[i], NULL);
             modThreadCount(-1);
@@ -358,7 +358,7 @@ void *euclidean(void *arg)
         accumulator = 0;
         for (int j = 0; j < d; j++)
         {
-            accumulator += pow((point[j] - *(points + i * d + j)), 2);
+            accumulator += (point[j] - *(points + i * d + j)) * (point[j] - *(points + i * d + j));
         }
         distances[i] = sqrt(accumulator);
     }

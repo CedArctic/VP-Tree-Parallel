@@ -197,7 +197,7 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
 		{
 			// Vectorized calculations
 			accumulator[i*d:d] = point[0:d] - points[i*d:d];
-			accumulator[i*d:d] = pow(accumulator[i*d:d], 2);
+			accumulator[i*d:d] = accumulator[i*d:d] * accumulator[i*d:d];
 			// Use a reducer to sum up all elements of the accumulator vector and get its sqrt
 			distances[i] = sqrt(__sec_reduce_add (accumulator[i*d:d]));
 		}
@@ -209,7 +209,7 @@ void euclidean(double *point, double *points, double *distances, int n, int d)
             accumulator_seq = 0;
             for (int j = 0; j < d; j++)
             {
-                accumulator_seq += pow((point[j] - *(points + i * d + j)), 2);
+                accumulator_seq += (point[j] - *(points + i * d + j)) * (point[j] - *(points + i * d + j));
             }
             //TODO: If the problem gets too big in size and accumulator values rise we will have to perform the sqrt operation
             // on every iteration to avoid overflowing
