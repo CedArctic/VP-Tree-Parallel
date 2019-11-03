@@ -53,7 +53,7 @@ typedef struct
 void *build_tree_wrapper(void *arg)
 {
     *((stargs *)arg)->subtree = build_tree(((stargs *)arg)->points, ((stargs *)arg)->ids, ((stargs *)arg)->n, ((stargs *)arg)->d);
-    return;
+    return 0;
 }
 
 // Function to safely alter the live thread count
@@ -357,7 +357,7 @@ void *euclidean(void *arg)
         }
         distances[i] = sqrt(accumulator);
     }
-    return;
+    return 0;
 }
 
 // A utility function to swap two elements
