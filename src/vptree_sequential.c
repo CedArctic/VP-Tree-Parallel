@@ -51,8 +51,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         node->outer = NULL;
         node->idx = ids[0];
         node->md = 0;
-        node->vp = calloc(d, sizeof(double));
-        memcpy(node->vp, points, sizeof(double) * d);
+        node->vp = points + ids[0] * d;
 
         // Return node
         return node;
@@ -164,8 +163,8 @@ void swap_double(double *a, double *b){
 }
 
 // A utility function to swap two elements
-void swap_int(double *a, double *b){
-    double t = *a;
+void swap_int(int *a, int *b){
+    int t = *a;
     *a = *b;
     *b = t;
 }

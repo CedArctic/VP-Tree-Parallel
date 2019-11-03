@@ -55,7 +55,7 @@ typedef struct
 void *build_tree_wrapper(void *arg)
 {
     *((stargs *)arg)->subtree = build_tree(((stargs *)arg)->points, ((stargs *)arg)->ids, ((stargs *)arg)->n, ((stargs *)arg)->d);
-    return;
+    return 0;
 }
 
 // Function to safely alter the live thread count
@@ -94,7 +94,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         node->outer = NULL;
         node->idx = ids[0];
         node->md = 0;
-        node->vp = points;
+        node->vp = points + ids[0] * d;
 
         // Return node
         return node;
@@ -332,7 +332,7 @@ void *euclidean(void *arg){
         }
         distances[i] = sqrt(accumulator);
     }
-    return;
+    return 0;
 }
 
 // A utility function to swap two elements
