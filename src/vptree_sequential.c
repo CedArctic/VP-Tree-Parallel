@@ -44,7 +44,8 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     vptree *node = calloc(1, sizeof(vptree));
 
     // Check to end recursion: if points array is of size 0 - we are returning a leaf
-    if (n == 1){
+    if (n == 1)
+    {
         // Build node
         node->inner = NULL;
         node->outer = NULL;
@@ -74,21 +75,21 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     // Sort points into two new arrays
     // Calculate array sizes for subtrees. Values up to and equal to the median go on the inner tree
     int innerLength = 0;
-    for (int i = 0; i < n-1; i++){
-        if(distances[i] <= median){
+    for (int i = 0; i < n-1; i++)
+    {
+        if(distances[i] <= median)
+        {
             innerLength++;
         }
     }
     int outerLength = n - 1 - innerLength;
-    //TODO: Perhaps use distancesCopy to reduce the above linear scan to half
 
     // Get pointers to the parts of ids which correspond to points that belong on the inner and outer subtrees
     int *innerIDs = ids;
     int *outerIDs = ids + innerLength;
 
-    // Assign node fields
+    // Set node fields
     node->md = median;
-    // Copy the point into vp because we will call free(points) that will also free(point)
     node->vp = point;
     node->idx = id;
 
@@ -169,8 +170,8 @@ void swap_int(double *a, double *b){
     *b = t;
 }
 
-// QuickSort Partition function
-// low and high are the range of indexes in arr where partition should work
+
+// QuickSort Partition function. low and high define the range of indexes in arr where partition should work
 int partition (double arr[], int *ids, int low, int high){
 
     // Select a pivot and initialize flag to position of smallest element before pivot
@@ -225,6 +226,7 @@ double quickselect(double arr[], int *ids, int length, int idx){
     int lowerLength = pivotIndex;
     pivotIndex++;
     int higherLength = (length - (lowerLength + 1));
+
     // At this point pivotIndex, lowerLength and higherLength all start from 1 not 0
 
     // Variable to store result of following recursive calls
