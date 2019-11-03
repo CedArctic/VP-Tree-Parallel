@@ -146,7 +146,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
             disArg[i].point = point;
             disArg[i].ids = ids + i * blockSize;
             disArg[i].tid = i + 1;
-            disArg[i].points = points + i * blockSize * d;
+            disArg[i].points = points;
             disArg[i].distances = distances + i * blockSize;
             disArg[i].n = blockSize;
             pthread_create(&disThread[i], NULL, euclidean, (void *)&disArg[i]);
@@ -157,7 +157,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         disArg[threads - 1].point = point;
         disArg[threads - 1].ids = ids + (threads - 1) * blockSize;
         disArg[threads - 1].tid = 0;
-        disArg[threads - 1].points = points + (threads - 1) * blockSize * d;
+        disArg[threads - 1].points = points;
         disArg[threads - 1].distances = distances + (threads - 1) * blockSize;
         disArg[threads - 1].n = (n-1) - blockSize * (threads - 1);
         euclidean((void *)&disArg[threads - 1]);
