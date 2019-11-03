@@ -9,7 +9,7 @@
 
 // Number of threads for Cilk to use
 #define THREADS "8"
-// Threshold of points to switch to sequential execution - I recommend turning this off (setting to 0) and let cilk manage it
+// Threshold of points to switch to sequential execution. I recommend turning this off (setting to 0) and let cilk manage it
 #define POINT_THRESHOLD 0
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
 #define PARALLELDIS true
@@ -53,7 +53,8 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     vptree *node = calloc(1, sizeof(vptree));
 
     // Check to end recursion: if points array is of size 0 - we are returning a leaf
-    if (n == 1){
+    if (n == 1)
+    {
         // Build node
         node->inner = NULL;
         node->outer = NULL;
@@ -96,7 +97,6 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         }
     }
     int outerLength = n - 1 - innerLength;
-    //TODO: Perhaps use distancesCopy to reduce the above linear scan to half
 
     // Pointers to keep track of inner and outer arrays content while sorting points
     int innerPointer = 0;
@@ -108,7 +108,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     int *innerIDs = calloc(innerLength, sizeof(int));
     int *outerIDs = calloc(outerLength, sizeof(int));
 
-    // Sort points
+    // Sort points to inner and outer subtree
     for (int i = 0; i < n-1; i++){
         if(distances[i] <= median){
             memcpy(innerPoints + innerPointer * d, points + i*d, sizeof(double) * d);
@@ -122,9 +122,10 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         }
     }
 
-    node->md = median;
+    // Set node fields
     // Copy the point into vp because we will call free(points) that will also free(point)
     node->vp = calloc(d, sizeof(double));
+    node->md = median;
     memcpy(node->vp, point, sizeof(double) * d);
     node->idx = id;
 
@@ -133,7 +134,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     free(distances);
     free(ids);
 
-    // Calculate (in parallel if possible) subtrees and assign node fields
+    // Calculate subtrees in parallel if possible
     if((innerLength > 0) && (outerLength > 0)){
         node->outer = cilk_spawn build_tree(outerPoints, outerIDs, outerLength, d);
         node->inner = build_tree(innerPoints, innerIDs, innerLength, d);
@@ -226,8 +227,7 @@ void swap(double *a, double *b){
     *b = t;
 }
 
-// QuickSort Partition function
-// low and high are the range of indexes in arr where partition should work
+// QuickSort Partition function. low and high are the range of indexes in arr where partition should work
 int partition (double arr[], int low, int high){
 
     // Select a pivot and initialize flag to position of smallest element before pivot
@@ -279,6 +279,7 @@ double quickselect(double arr[], int length, int idx){
     int lowerLength = pivotIndex;
     pivotIndex++;
     int higherLength = (length - (lowerLength + 1));
+
     // At this point pivotIndex, lowerLength and higherLength all start from 1 not 0
     double *lower = calloc(lowerLength, sizeof(double));
     double *higher = calloc(higherLength, sizeof(double));

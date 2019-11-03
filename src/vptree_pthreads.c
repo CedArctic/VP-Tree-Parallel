@@ -8,7 +8,7 @@
 
 // Threshold of points to switch to sequential execution
 #define POINT_THRESHOLD 1000
-// Threshold of maximum live threads simultaneously
+// Threshold of maximum simultaneous live threads
 #define THREADS_MAX 16
 // Development flags to switch execution mode from serial to parallel for distance calculation and subtree creation
 #define PARALLELDIS true
@@ -56,7 +56,7 @@ void *build_tree_wrapper(void *arg)
     return;
 }
 
-// Function to alter the live thread count
+// Function to safely alter the live thread count
 void modThreadCount(int n){
     pthread_mutex_lock( &threadMutex );
     threadCount += n;
@@ -84,7 +84,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     // Create node to be returned
     vptree *node = calloc(1, sizeof(vptree));
 
-    // Check to end recursion: if points array is of size 0 - we are returning a leaf
+    // Check to end recursion. If points contains only one point we are returning a leaf
     if (n == 1)
     {
         // Build node
@@ -110,7 +110,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     // Create array that holds euclidean distance of point from all other points
     double *distances = calloc(n-1, sizeof(double));
 
-    // Dynamically decide number of threads for distance calculation - Play with these values to optimize
+    // Dynamically decide number of threads for distance calculation
     int threads = 1;
     if(THREADS_MAX - threadCount >= 16){
         threads = 16;
@@ -142,7 +142,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         disThread = calloc(threads - 1, sizeof(pthread_t));
         disArg = calloc(threads, sizeof(dtargs));
 
-        // Create threads
+        // Create threads and assign work to them
         for (int i = 0; i < threads - 1; i++)
         {
             disArg[i].d = d;
@@ -163,7 +163,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         disArg[threads - 1].n = (n-1) - blockSize * (threads - 1);
         euclidean((void *)&disArg[threads - 1]);
 
-        // Join threads and decrement live thread count
+        // Join threads and decrement live threads count
         for (int i = 0; i < threads - 1; i++)
         {
             pthread_join(disThread[i], NULL);
@@ -203,7 +203,6 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         }
     }
     int outerLength = n - 1 - innerLength;
-    //TODO: Perhaps use distancesCopy to reduce the above linear scan to half
 
     // Pointers to keep track of inner and outer arrays content while sorting points
     int innerPointer = 0;
@@ -215,7 +214,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     int *innerIDs = calloc(innerLength, sizeof(int));
     int *outerIDs = calloc(outerLength, sizeof(int));
 
-    // Sort points
+    // Sort points to inner and outer subtree
     for (int i = 0; i < n-1; i++)
     {
         if(distances[i] <= median)
@@ -232,9 +231,10 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         }
     }
 
-    node->md = median;
+    // Set node fields
     // Copy the point into vp because we will call free(points) that will also free(point)
     node->vp = calloc(d, sizeof(double));
+    node->md = median;
     memcpy(node->vp, point, sizeof(double) * d);
     node->idx = id;
 
@@ -242,9 +242,6 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     free(points);
     free(distances);
     free(ids);
-
-    // Booleans to keep track whether a thread has been created to work on a subtree
-    bool threadActive = false;
 
     // Thread and stargs arrays for parallel subtree threads
     pthread_t subThread;
@@ -260,7 +257,6 @@ vptree * build_tree(double *points, int *ids, int n, int d)
             // Start inner tree creation on a thread
             modThreadCount(1);
             subArg = malloc(sizeof(stargs));
-            threadActive = true;
             subArg->d = d;
             subArg->n = innerLength;
             subArg->subtree = &node->inner;
@@ -297,7 +293,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         }
     }
 
-
+    // Check if a subtree is empty and assign null to its pointer
     if(innerLength < 1)
     {
         node->inner = NULL;
@@ -343,7 +339,6 @@ int getIDX(vptree * T)
 // Calculates the distances of all points from point and writes them to an array
 void *euclidean(void *arg)
 {
-
     // Retrieve variables by casting the argument to a dtarg struct pointer
     double *point = ((dtargs *) arg) -> point;
     double *points = ((dtargs *) arg) -> points;
@@ -373,8 +368,7 @@ void swap(double *a, double *b)
     *b = t;
 }
 
-// QuickSort Partition function
-// low and high are the range of indexes in arr where partition should work
+// QuickSort Partition function. low and high define the range of indexes in arr where partition should work
 int partition (double arr[], int low, int high)
 {
 
@@ -432,6 +426,7 @@ double quickselect(double arr[], int length, int idx)
     int lowerLength = pivotIndex;
     pivotIndex++;
     int higherLength = (length - (lowerLength + 1));
+
     // At this point pivotIndex, lowerLength and higherLength all start from 1 not 0
     double *lower = calloc(lowerLength, sizeof(double));
     double *higher = calloc(higherLength, sizeof(double));
@@ -464,4 +459,3 @@ double quickselect(double arr[], int length, int idx)
     // Return result
     return result;
 }
-

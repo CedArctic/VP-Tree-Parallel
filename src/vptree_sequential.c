@@ -40,7 +40,8 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     vptree *node = calloc(1, sizeof(vptree));
 
     // Check to end recursion: if points array is of size 0 - we are returning a leaf
-    if (n == 1){
+    if (n == 1)
+    {
         // Build node
         node->inner = NULL;
         node->outer = NULL;
@@ -74,13 +75,14 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     // Sort points into two new arrays
     // Calculate array sizes for subtrees. Values up to and equal to the median go on the inner tree
     int innerLength = 0;
-    for (int i = 0; i < n-1; i++){
-        if(distances[i] <= median){
+    for (int i = 0; i < n-1; i++)
+    {
+        if(distances[i] <= median)
+        {
             innerLength++;
         }
     }
     int outerLength = n - 1 - innerLength;
-    //TODO: Perhaps use distancesCopy to reduce the above linear scan to half
 
     // Pointers to keep track of inner and outer arrays content while sorting points
     int innerPointer = 0;
@@ -92,7 +94,7 @@ vptree * build_tree(double *points, int *ids, int n, int d)
     int *innerIDs = calloc(innerLength, sizeof(int));
     int *outerIDs = calloc(outerLength, sizeof(int));
 
-    // Sort points
+    // Sort points to inner and outer subtree
     for (int i = 0; i < n-1; i++){
         if(distances[i] <= median){
             memcpy(innerPoints + innerPointer * d, points + i*d, sizeof(double) * d);
@@ -106,10 +108,10 @@ vptree * build_tree(double *points, int *ids, int n, int d)
         }
     }
 
-    // Assign node fields
-    node->md = median;
+    // Set node fields
     // Copy the point into vp because we will call free(points) that will also free(point)
     node->vp = calloc(d, sizeof(double));
+    node->md = median;
     memcpy(node->vp, point, sizeof(double) * d);
     node->idx = id;
 
@@ -185,8 +187,7 @@ void swap(double *a, double *b){
     *b = t;
 }
 
-// QuickSort Partition function
-// low and high are the range of indexes in arr where partition should work
+// QuickSort Partition function. low and high define the range of indexes in arr where partition should work
 int partition (double arr[], int low, int high){
 
     // Select a pivot and initialize flag to position of smallest element before pivot
@@ -238,6 +239,7 @@ double quickselect(double arr[], int length, int idx){
     int lowerLength = pivotIndex;
     pivotIndex++;
     int higherLength = (length - (lowerLength + 1));
+
     // At this point pivotIndex, lowerLength and higherLength all start from 1 not 0
     double *lower = calloc(lowerLength, sizeof(double));
     double *higher = calloc(higherLength, sizeof(double));
